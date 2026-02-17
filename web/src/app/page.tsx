@@ -1,29 +1,24 @@
 import Link from "next/link";
 
+import { Badge } from "@/components/ui";
+
 export default function Home() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_30%_0%,#ffe4b5,transparent_55%),radial-gradient(circle_at_80%_10%,#bfe7ff,transparent_45%),linear-gradient(to_bottom,#fff,#fafafa)] text-zinc-950">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-baseline gap-3">
-          <div className="text-xl font-semibold tracking-tight">
-            <span className="font-[family-name:var(--font-display)] text-2xl">
-              Drafted
-            </span>{" "}
-            MVP
-          </div>
-          <div className="rounded-full border border-zinc-900/10 bg-white/60 px-3 py-1 text-xs text-zinc-700 backdrop-blur">
-            API-first drafting
-          </div>
+    <div className="min-h-screen pb-16 text-[var(--color-ink)]">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-8">
+        <div className="flex flex-col gap-1">
+          <div className="kicker w-max reveal">Architectural AI</div>
+          <div className="reveal delay-1 text-2xl leading-none tracking-tight">Drafted Blueprint Studio</div>
         </div>
-        <nav className="flex items-center gap-3 text-sm">
+        <nav className="reveal delay-2 flex items-center gap-2 text-sm">
           <Link
-            className="rounded-full px-4 py-2 text-zinc-800 hover:bg-white/70"
+            className="nav-pill border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
             href="/login"
           >
             Log in
           </Link>
           <Link
-            className="rounded-full bg-zinc-950 px-4 py-2 text-white hover:bg-zinc-800"
+            className="nav-pill border border-transparent bg-[var(--color-accent)] text-[#00131f] hover:bg-[var(--color-accent-strong)]"
             href="/signup"
           >
             Create account
@@ -31,79 +26,93 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-6 pb-20 pt-8">
-        <section className="grid gap-8 md:grid-cols-2 md:items-center">
-          <div>
-            <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-tight md:text-6xl">
-              Draft floor plans in seconds.
-              <span className="block text-zinc-600">
-                Structured specs first. Visuals second.
-              </span>
+      <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-4">
+        <section className="grid gap-10 lg:grid-cols-[1.12fr_.88fr] lg:items-center">
+          <div className="reveal delay-1">
+            <h1 className="display-hero text-balance">
+              Blueprint-grade
+              <span className="block text-[var(--color-accent)]">home drafting.</span>
             </h1>
-            <p className="mt-5 max-w-xl text-pretty text-lg leading-7 text-zinc-700">
-              This MVP follows the architecture we discussed: authoritative{" "}
-              <span className="font-medium text-zinc-900">HouseSpec</span> +{" "}
-              <span className="font-medium text-zinc-900">PlanGraph</span>, then
-              deterministic plan SVG, and optional API-based exterior images.
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-[var(--color-ink-muted)]">
+              Drafted converts intent into deterministic structure before any polished render.
+              You get inspectable geometry, stage visibility, and export-ready artifacts.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
-                className="inline-flex items-center justify-center rounded-full bg-zinc-950 px-6 py-3 text-sm font-medium text-white hover:bg-zinc-800"
+                className="nav-pill h-11 border border-transparent bg-[var(--color-accent)] px-6 text-sm text-[#00131f] hover:bg-[var(--color-accent-strong)]"
                 href="/app"
               >
-                Open My Studio
+                Open Studio
               </Link>
               <Link
-                className="inline-flex items-center justify-center rounded-full border border-zinc-950/10 bg-white/60 px-6 py-3 text-sm font-medium text-zinc-900 hover:bg-white"
+                className="nav-pill h-11 border border-[var(--color-border)] bg-[var(--color-surface)] px-6 text-sm text-[var(--color-ink)]"
                 href="/app/drafts/new"
               >
-                New draft
+                Launch Draft Job
               </Link>
             </div>
-            <p className="mt-3 text-xs text-zinc-500">
-              No local model inference. AI calls are online/API-based. If keys
-              are missing, the workflow runs with a mock provider.
-            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge tone="accent">No local inference</Badge>
+              <Badge tone="neutral">Deterministic layout graph</Badge>
+              <Badge tone="success">Artifact-ready pipeline</Badge>
+            </div>
           </div>
 
-          <div className="rounded-3xl border border-zinc-900/10 bg-white/70 p-6 shadow-[0_30px_80px_-60px_rgba(0,0,0,.35)] backdrop-blur">
+          <div className="reveal delay-2 panel-ink blueprint-grid draft-glow p-6 md:p-7">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-zinc-900">
-                Example output artifacts
-              </div>
-              <div className="text-xs text-zinc-500">plan.svg + spec.json</div>
+              <div className="text-tech">Mission Dossier</div>
+              <Badge tone="warning">API-only</Badge>
             </div>
-            <div className="mt-4 grid gap-3">
-              <div className="rounded-2xl border border-zinc-900/10 bg-gradient-to-br from-zinc-50 to-white p-4">
-                <div className="text-xs font-semibold text-zinc-700">
-                  HouseSpec (authoritative)
-                </div>
-                <pre className="mt-2 overflow-hidden rounded-xl bg-zinc-950 px-4 py-3 text-[11px] leading-5 text-zinc-100">
+            <div className="mt-5 grid gap-3">
+              <article className="panel-frost p-4">
+                <div className="text-tech">Intent packet</div>
+                <pre className="mt-2 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3 text-[11px] leading-5 text-[var(--color-ink)]">
 {`{
-  "style": "modern_farmhouse",
-  "bedrooms": 3,
-  "bathrooms": 2,
-  "rooms": [...]
+  "style": "contemporary",
+  "bedrooms": 4,
+  "bathrooms": 3,
+  "constraints": ["open kitchen", "sunlight"],
+  "lot_mode": "urban"
 }`}
                 </pre>
-              </div>
-              <div className="rounded-2xl border border-zinc-900/10 bg-gradient-to-br from-zinc-50 to-white p-4">
-                <div className="text-xs font-semibold text-zinc-700">
-                  PlanGraph (deterministic)
-                </div>
-                <div className="mt-2 text-sm text-zinc-600">
-                  Rectangular room packing with labeled SVG output.
-                </div>
-              </div>
-              <div className="rounded-2xl border border-zinc-900/10 bg-gradient-to-br from-zinc-50 to-white p-4">
-                <div className="text-xs font-semibold text-zinc-700">
-                  Optional exterior image (API)
-                </div>
-                <div className="mt-2 text-sm text-zinc-600">
-                  Enabled when <code>GEMINI_API_KEY</code> is set.
-                </div>
-              </div>
+              </article>
+              <article className="panel-frost p-4">
+                <div className="text-tech">Validation chain</div>
+                <p className="mt-2 text-sm leading-6 text-[var(--color-ink-muted)]">
+                  House spec parsing, adjacency checks, circulation rules, then artifact rendering.
+                </p>
+              </article>
+              <article className="panel-frost p-4">
+                <div className="text-tech">Deliverables</div>
+                <p className="mt-2 text-sm leading-6 text-[var(--color-ink-muted)]">
+                  Plan SVG, structured JSON, optional exterior visualization, downloadable export package.
+                </p>
+              </article>
             </div>
+          </div>
+        </section>
+
+        <section className="mt-12 grid gap-4 md:grid-cols-3">
+          <div className="reveal delay-1 panel-frost p-5">
+            <p className="text-tech">Step 1</p>
+            <h3 className="mt-2 text-xl">Define design intent</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--color-ink-muted)]">
+              Capture requirements and style in a constrained prompt envelope.
+            </p>
+          </div>
+          <div className="reveal delay-2 panel-frost p-5">
+            <p className="text-tech">Step 2</p>
+            <h3 className="mt-2 text-xl">Validate geometry</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--color-ink-muted)]">
+              Reject impossible room relationships before costly generation steps.
+            </p>
+          </div>
+          <div className="reveal delay-3 panel-frost p-5">
+            <p className="text-tech">Step 3</p>
+            <h3 className="mt-2 text-xl">Review artifacts</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--color-ink-muted)]">
+              Inspect timeline, warnings, and export outputs with provenance context.
+            </p>
           </div>
         </section>
       </main>
