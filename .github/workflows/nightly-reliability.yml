@@ -1,0 +1,47 @@
+name: nightly-reliability
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BASELINE_DURATION: 20m
+      BASELINE_VUS: "10"
+      TRANSIENT_DURATION: 45m
+      TRANSIENT_VUS: "10"
+      TRANSIENT_FAIL_FIRST_N: "2000"
+      TRANSIENT_FAIL_EVERY_N: "250"
+      RETRY_ADHERENCE_MIN: "99.5"
+      PYTHON_BIN: python3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install API dependencies
+        run: python3 -m pip install -r api/requirements.txt
+
+      - name: Run nightly validation
+        run: bash scripts/run_prebeta_validation.sh
+
+      - name: Upload nightly reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-reliability-reports
+          path: var/reports

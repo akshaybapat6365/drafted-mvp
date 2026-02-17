@@ -1,0 +1,12 @@
+{$DRAFTED_DOMAIN:localhost} {
+  encode gzip zstd
+
+  @api path /api/* /healthz
+  handle @api {
+    reverse_proxy api:8000
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
+}

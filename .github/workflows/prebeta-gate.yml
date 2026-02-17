@@ -1,0 +1,49 @@
+name: prebeta-gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - beta
+  workflow_dispatch:
+
+jobs:
+  prebeta-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      BASELINE_DURATION: 2m
+      BASELINE_VUS: "6"
+      TRANSIENT_DURATION: 3m
+      TRANSIENT_VUS: "6"
+      TRANSIENT_FAIL_FIRST_N: "200"
+      TRANSIENT_FAIL_EVERY_N: "0"
+      RETRY_ADHERENCE_MIN: "99.5"
+      PYTHON_BIN: python3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Install API dependencies
+        run: python3 -m pip install -r api/requirements.txt
+
+      - name: Run pre-beta validation
+        run: bash scripts/run_prebeta_validation.sh
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebeta-reports
+          path: var/reports

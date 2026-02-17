@@ -1,0 +1,12 @@
+2026-02-17T00:36:33Z begin failure-injection
+2026-02-17T00:36:53Z kill_worker
+Worker outage injection complete (15s).
+2026-02-17T00:37:40Z block_provider
+Worker network outage complete (15s).
+2026-02-17T00:38:16Z redis_bounce
+Redis bounce complete (12s).
+2026-02-17T00:38:50Z db_latency
+228ca739a3c3de7187dbc4214f3bf09ca1c2b1e27e304c67e1581bb59971ce00
+228ca739a3c3de7187dbc4214f3bf09ca1c2b1e27e304c67e1581bb59971ce00
+Postgres pause/unpause complete (12s).
+2026-02-17T00:39:02Z end failure-injection

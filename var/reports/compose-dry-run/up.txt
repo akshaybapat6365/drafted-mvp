@@ -1,0 +1,122 @@
+Sending build context to Docker daemon  64.62kB
+Sending build context to Docker daemon  64.62kB
+Step 1/12 : FROM python:3.13-slim
+Step 1/12 : FROM python:3.13-slim
+ ---> 3de9a8d7aedb
+Step 2/12 : ENV PYTHONDONTWRITEBYTECODE=1
+ ---> 3de9a8d7aedb
+Step 2/12 : ENV PYTHONDONTWRITEBYTECODE=1
+ ---> Using cache
+ ---> 9532f9834e21
+Step 3/12 : ENV PYTHONUNBUFFERED=1
+ ---> Using cache
+ ---> 9532f9834e21
+Step 3/12 : ENV PYTHONUNBUFFERED=1
+ ---> Using cache
+ ---> 5209a9bd274a
+Step 4/12 : WORKDIR /app
+ ---> Using cache
+ ---> 5209a9bd274a
+Step 4/12 : WORKDIR /app
+ ---> Using cache
+ ---> cb03ccb9d695
+Step 5/12 : COPY requirements.txt /app/requirements.txt
+ ---> Using cache
+ ---> cb03ccb9d695
+Step 5/12 : COPY requirements.txt /app/requirements.txt
+ ---> Using cache
+ ---> 30a334c3d2b2
+ ---> Using cache
+Step 6/12 : RUN pip install --no-cache-dir -r /app/requirements.txt ---> 30a334c3d2b2
+
+Step 6/12 : RUN pip install --no-cache-dir -r /app/requirements.txt
+ ---> Using cache
+ ---> 0e02fba2c5f2
+Step 7/12 : COPY app /app/app
+ ---> Using cache
+ ---> 0e02fba2c5f2
+Step 7/12 : COPY app /app/app
+ ---> 53373398fd77
+Step 8/12 : RUN useradd --create-home appuser && mkdir -p /app/var && chown -R appuser:appuser /app
+ ---> 6d491eec74d6
+Step 8/12 : RUN useradd --create-home appuser && mkdir -p /app/var && chown -R appuser:appuser /app
+ ---> Running in a8a2f0126b61
+ ---> Running in 3889bd558c0c
+ ---> Removed intermediate container a8a2f0126b61
+ ---> 994b27861bdb
+Step 9/12 : USER appuser
+ ---> Running in 491a91824369
+ ---> Removed intermediate container 3889bd558c0c
+ ---> 5ce28bf38bd5
+Step 9/12 : USER appuser
+ ---> Running in 84ccb9e1d5c3
+ ---> Removed intermediate container 491a91824369
+ ---> 95eb02712e0b
+Step 10/12 : EXPOSE 8000
+ ---> Removed intermediate container 84ccb9e1d5c3
+ ---> 84328e3ce255
+Step 10/12 : EXPOSE 8000
+ ---> Running in b5b5e6562c82
+ ---> Running in 9db33b76ef89
+ ---> Removed intermediate container b5b5e6562c82
+ ---> 01629bfe2579
+Step 11/12 : CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ ---> Removed intermediate container 9db33b76ef89
+ ---> 590c61b4f246
+Step 11/12 : CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ ---> Running in ebebc1733cf8
+ ---> Running in 66f639f0575a
+ ---> Removed intermediate container 66f639f0575a
+ ---> f3ac92f543e5
+Step 12/12 : LABEL com.docker.compose.image.builder=classic
+ ---> Removed intermediate container ebebc1733cf8
+ ---> 9633dcdd7fad
+Step 12/12 : LABEL com.docker.compose.image.builder=classic
+ ---> Running in f184ca1cb9ef
+ ---> Running in 6806f5fbcd58
+ ---> Removed intermediate container f184ca1cb9ef
+ ---> 9bd81666affe
+ ---> Removed intermediate container 6806f5fbcd58
+ ---> c9ad83c2e2fc
+Successfully built 9bd81666affe
+Successfully built c9ad83c2e2fc
+Successfully tagged drafted-worker:latest
+Successfully tagged drafted-api:latest
+Sending build context to Docker daemon  73.68kB
+Step 1/12 : FROM node:20-alpine
+ ---> 09e2b3d97260
+Step 2/12 : WORKDIR /app
+ ---> Using cache
+ ---> e2324ddb6fbb
+Step 3/12 : COPY package.json package-lock.json /app/
+ ---> Using cache
+ ---> be4c7cfb0422
+Step 4/12 : RUN npm ci
+ ---> Using cache
+ ---> c7cf6e140dbb
+Step 5/12 : COPY . /app
+ ---> Using cache
+ ---> 0d0f33a55e34
+Step 6/12 : RUN npm run build
+ ---> Using cache
+ ---> 47f616c8ce67
+Step 7/12 : ENV NODE_ENV=production
+ ---> Using cache
+ ---> 2d4a3ff16020
+Step 8/12 : ENV PORT=3000
+ ---> Using cache
+ ---> 8471c1cebf08
+Step 9/12 : ENV HOSTNAME=0.0.0.0
+ ---> Using cache
+ ---> 6a09d2c26b3e
+Step 10/12 : EXPOSE 3000
+ ---> Using cache
+ ---> 5eba4e92887f
+Step 11/12 : CMD ["npm", "run", "start"]
+ ---> Using cache
+ ---> 3ce1b3ee78f5
+Step 12/12 : LABEL com.docker.compose.image.builder=classic
+ ---> Using cache
+ ---> 77298561f098
+Successfully built 77298561f098
+Successfully tagged drafted-web:latest
