@@ -1,0 +1,31 @@
+name: live-provider-canary
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 6 * * *"
+
+jobs:
+  live-provider-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    env:
+      PROJECT_NAME: drafted-live-canary
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run live provider canary
+        run: bash scripts/run_live_provider_canary.sh
+
+      - name: Upload canary reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-provider-canary-reports
+          path: var/reports/live-provider-canary

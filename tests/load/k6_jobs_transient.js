@@ -17,6 +17,7 @@ export const options = {
     http_req_failed: ["rate<0.03"],
     http_req_duration: ["p(95)<3000"],
   },
+  systemTags: ["status", "method", "name", "scenario", "expected_response"],
 };
 
 function uniqueSuffix() {
@@ -31,7 +32,10 @@ export function setup() {
   const signup = http.post(
     `${BASE_URL}/api/v1/auth/signup`,
     JSON.stringify({ email, password }),
-    { headers: { "content-type": "application/json" } },
+    {
+      headers: { "content-type": "application/json" },
+      tags: { name: "POST /api/v1/auth/signup" },
+    },
   );
   check(signup, { "signup ok": (r) => r.status === 200 });
 
@@ -44,7 +48,10 @@ export function setup() {
   const session = http.post(
     `${BASE_URL}/api/v1/sessions`,
     JSON.stringify({ title: `LoadTransient-${suffix}` }),
-    { headers: authHeaders },
+    {
+      headers: authHeaders,
+      tags: { name: "POST /api/v1/sessions" },
+    },
   );
   check(session, { "session create ok": (r) => r.status === 200 });
 
@@ -66,13 +73,20 @@ export default function (data) {
   const submit = http.post(
     `${BASE_URL}/api/v1/jobs/sessions/${data.sessionId}`,
     JSON.stringify(payload),
-    { headers: data.authHeaders },
+    {
+      headers: data.authHeaders,
+      tags: { name: "POST /api/v1/jobs/sessions/:id" },
+    },
   );
   check(submit, { "job submit ok": (r) => r.status === 200 });
 
   const jobId = submit.json("id");
   if (jobId) {
-    const status = http.get(`${BASE_URL}/api/v1/jobs/${jobId}`, { headers: data.authHeaders });
+    const statusUrl = http.url`${BASE_URL}/api/v1/jobs/${jobId}`;
+    const status = http.get(statusUrl, {
+      headers: data.authHeaders,
+      tags: { name: "GET /api/v1/jobs/:id" },
+    });
     check(status, { "job status readable": (r) => r.status === 200 });
   }
 
