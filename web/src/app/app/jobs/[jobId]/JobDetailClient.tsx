@@ -86,7 +86,10 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorRetryable, setErrorRetryable] = useState(false);
+  const [errorAttempts, setErrorAttempts] = useState<number | null>(null);
   const [artifactsError, setArtifactsError] = useState<string | null>(null);
+  const [artifactsErrorCode, setArtifactsErrorCode] = useState<string | null>(null);
+  const [artifactsErrorAttempts, setArtifactsErrorAttempts] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -143,6 +146,11 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     () => stageDurations.reduce((acc, item) => acc + item.seconds, 0),
     [stageDurations],
   );
+  const manifestItems = useMemo(
+    () => artifacts.filter((artifact) => Boolean(artifact.id && artifact.type && artifact.url)),
+    [artifacts],
+  );
+  const malformedArtifactCount = artifacts.length - manifestItems.length;
   const unaccountedStageSeconds = Math.max(0, runTime - accountedStageSeconds);
   const terminal = job ? isTerminalStatus(job.status) : false;
 
@@ -156,6 +164,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     if (interactive) setRefreshing(true);
     if (!job) setLoading(true);
     setArtifactsError(null);
+    setArtifactsErrorCode(null);
+    setArtifactsErrorAttempts(null);
 
     const r = await apiJson<JobOut>(`/api/v1/jobs/${encodeURIComponent(jobId)}`, {
       retries: 1,
@@ -165,6 +175,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setRefreshing(false);
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryableStatus(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.status === 401 ? "Please log in to view this job." : r.error);
       setPollMs((current) => Math.min(current * 2, 10_000));
       return;
@@ -174,6 +185,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     setJob(r.data);
     setLoading(false);
     setRefreshing(false);
@@ -190,8 +202,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       if (a.ok) {
         setArtifacts(a.data.items);
       } else {
-        setErrorCode(a.code ?? null);
-        setErrorRetryable(isRetryableStatus(a.status));
+        setArtifactsErrorCode(a.code ?? null);
+        setArtifactsErrorAttempts(a.attempts ?? null);
         setArtifactsError(a.error);
       }
       return;
@@ -203,6 +215,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     setRegenerating(true);
     const r = await apiJson<JobOut>(
       `/api/v1/jobs/${encodeURIComponent(jobId)}/regenerate`,
@@ -215,6 +228,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     if (!r.ok) {
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryableStatus(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.error);
       return;
     }
@@ -225,6 +239,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     setRetryingFailed(true);
     const r = await apiJson<JobOut>(
       `/api/v1/jobs/${encodeURIComponent(jobId)}/regenerate`,
@@ -237,6 +252,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     if (!r.ok) {
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryableStatus(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.error);
       return;
     }
@@ -247,6 +263,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     setExporting(true);
     const r = await apiJson<{ url: string }>(
       `/api/v1/jobs/${encodeURIComponent(jobId)}/export`,
@@ -260,6 +277,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     if (!r.ok) {
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryableStatus(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.error);
       return;
     }
@@ -337,6 +355,9 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               >
                 {autoRefresh ? "Auto-refresh on" : "Auto-refresh off"}
               </Button>
+              {autoRefresh && !terminal && pollMs > 1100 ? (
+                <Badge tone="warning">poll backoff: {(pollMs / 1000).toFixed(1)}s</Badge>
+              ) : null}
               <Button variant="ghost" size="md" onClick={copyJobId}>
                 {copyState === "copied"
                   ? "Copied"
@@ -386,6 +407,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
             message={error}
             code={errorCode}
             retryable={errorRetryable}
+            attempts={errorAttempts ?? undefined}
             action={
               error.includes("log in") ? (
                 <Link className="font-semibold underline" href="/login">
@@ -429,7 +451,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           <StaggerItem>
             <Card className="p-4" tone="plate">
               <div className="text-tech">Artifacts</div>
-              <div className="mt-2 text-3xl font-semibold">{artifacts.length}</div>
+              <div className="mt-2 text-3xl font-semibold">{manifestItems.length}</div>
               <div className="mt-1 text-xs text-[var(--color-ink-muted)]">
                 persisted outputs for this run
               </div>
@@ -566,7 +588,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               <Card className="p-6 md:p-7" tone="ink">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold">Primary outputs</h2>
-                  <Badge tone="accent">{artifacts.length} artifacts</Badge>
+                  <Badge tone="accent">{manifestItems.length} artifacts</Badge>
                 </div>
                 <div className="soft-divider mt-4" />
 
@@ -628,13 +650,20 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                   <div className="mt-4">
                     <ErrorPanel
                       message={artifactsError}
-                      code={errorCode}
-                      retryable={errorRetryable}
+                      code={artifactsErrorCode}
+                      retryable
+                      attempts={artifactsErrorAttempts ?? undefined}
                     />
                   </div>
                 ) : null}
+                {malformedArtifactCount > 0 ? (
+                  <div className="mt-4 rounded-xl border border-[color-mix(in srgb,var(--color-warning) 52%,transparent)] bg-[color-mix(in srgb,var(--color-warning) 14%,transparent)] px-3 py-2 text-xs text-[var(--color-warning)]">
+                    {malformedArtifactCount} malformed artifact
+                    {malformedArtifactCount > 1 ? "s were" : " was"} hidden.
+                  </div>
+                ) : null}
                 <div className="mt-4 grid gap-3">
-                  {artifacts.length === 0 ? (
+                  {manifestItems.length === 0 ? (
                     <EmptyState
                       title="No artifacts yet"
                       description={
@@ -644,7 +673,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                       }
                     />
                   ) : (
-                    artifacts.map((artifact) => (
+                    manifestItems.map((artifact) => (
                       <a
                         key={artifact.id}
                         href={artifact.url}

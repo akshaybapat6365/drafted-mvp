@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorRetryable, setErrorRetryable] = useState(false);
+  const [errorAttempts, setErrorAttempts] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -42,6 +43,7 @@ export default function LoginPage() {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     setLoading(true);
     if (!firebaseEnabled) {
       const r = await apiJson<{ access_token: string }>("/api/v1/auth/login", {
@@ -53,6 +55,7 @@ export default function LoginPage() {
       if (!r.ok) {
         setErrorCode(r.code ?? null);
         setErrorRetryable(isRetryable(r.status));
+        setErrorAttempts(r.attempts ?? null);
         setError(r.status === 401 ? "Invalid email or password." : r.error);
         return;
       }
@@ -74,6 +77,7 @@ export default function LoginPage() {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     if (!firebaseEnabled) {
       setError("Google sign-in is unavailable because Firebase auth is not configured.");
       return;
@@ -153,7 +157,12 @@ export default function LoginPage() {
 
               {error ? (
                 <FadeSlideIn delay={0.02}>
-                  <ErrorPanel message={error} code={errorCode} retryable={errorRetryable} />
+                  <ErrorPanel
+                    message={error}
+                    code={errorCode}
+                    retryable={errorRetryable}
+                    attempts={errorAttempts ?? undefined}
+                  />
                 </FadeSlideIn>
               ) : null}
 

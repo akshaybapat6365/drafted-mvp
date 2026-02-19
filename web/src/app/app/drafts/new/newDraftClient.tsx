@@ -107,6 +107,7 @@ export default function NewDraftClient({
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorRetryable, setErrorRetryable] = useState(false);
+  const [errorAttempts, setErrorAttempts] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const selectedSession = useMemo(
@@ -167,10 +168,12 @@ export default function NewDraftClient({
   async function loadSessions() {
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     const r = await apiJson<SessionOut[]>("/api/v1/sessions", { retries: 1 });
     if (!r.ok) {
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryable(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.status === 401 ? "Please log in to draft." : r.error);
       return;
     }
@@ -188,6 +191,7 @@ export default function NewDraftClient({
     if (!r.ok) {
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryable(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.error);
       return null;
     }
@@ -199,6 +203,7 @@ export default function NewDraftClient({
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     setSubmitting(true);
     const normalizedIdempotencyKey = idempotencyKey.trim().slice(0, 80);
     const sid = await ensureSession();
@@ -227,6 +232,7 @@ export default function NewDraftClient({
     if (!r.ok) {
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryable(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.error);
       return;
     }
@@ -293,6 +299,7 @@ export default function NewDraftClient({
             message={error}
             code={errorCode}
             retryable={errorRetryable}
+            attempts={errorAttempts ?? undefined}
             action={
               error.includes("log in") ? (
                 <Link className="font-semibold underline" href="/login">

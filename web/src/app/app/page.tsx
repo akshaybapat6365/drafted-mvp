@@ -36,10 +36,12 @@ export default function StudioPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorRetryable, setErrorRetryable] = useState(false);
+  const [errorAttempts, setErrorAttempts] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [staleData, setStaleData] = useState(false);
   const [providerMode, setProviderMode] = useState<ProviderMode | "unknown">("unknown");
 
   const sortedSessions = useMemo(
@@ -99,6 +101,8 @@ export default function StudioPage() {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
+    setStaleData(false);
 
     const [r, j] = await Promise.all([
       apiJson<SessionOut[]>("/api/v1/sessions", { retries: 1 }),
@@ -110,9 +114,14 @@ export default function StudioPage() {
       setRefreshing(false);
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryable(r.status));
+      setErrorAttempts(r.attempts ?? null);
       setError(r.status === 401 ? "Please log in to continue." : r.error);
-      setSessions([]);
-      setJobs([]);
+      if (firstLoad) {
+        setSessions([]);
+        setJobs([]);
+      } else {
+        setStaleData(true);
+      }
       return;
     }
     setSessions(r.data);
@@ -121,11 +130,14 @@ export default function StudioPage() {
       setRefreshing(false);
       setErrorCode(j.code ?? null);
       setErrorRetryable(isRetryable(j.status));
+      setErrorAttempts(j.attempts ?? null);
       setError("Session data refreshed, but jobs could not be loaded.");
+      setStaleData(true);
       setLastSyncedAt(new Date().toISOString());
       return;
     }
     setJobs(j.data);
+    setStaleData(false);
     setLastSyncedAt(new Date().toISOString());
     setLoading(false);
     setRefreshing(false);
@@ -141,6 +153,7 @@ export default function StudioPage() {
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
+    setErrorAttempts(null);
     const r = await apiJson<SessionOut>("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify({ title: "My Studio" }),
@@ -150,6 +163,7 @@ export default function StudioPage() {
     if (!r.ok) {
       setErrorCode(r.code ?? null);
       setErrorRetryable(isRetryable(r.status));
+      setErrorAttempts(r.attempts ?? null);
       return setError(r.error);
     }
     await refresh();
@@ -208,6 +222,7 @@ export default function StudioPage() {
             message={error}
             code={errorCode}
             retryable={errorRetryable}
+            attempts={errorAttempts ?? undefined}
             action={
               error.includes("log in") ? (
                 <Link className="font-semibold underline" href="/login">
@@ -220,8 +235,13 @@ export default function StudioPage() {
       ) : null}
 
       {lastSyncedAt ? (
-        <div className="text-xs uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
-          Last sync: {new Date(lastSyncedAt).toLocaleString()}
+        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+          <span>Last sync: {new Date(lastSyncedAt).toLocaleString()}</span>
+          {staleData ? (
+            <Badge tone="warning">stale data</Badge>
+          ) : (
+            <Badge tone="success">live data</Badge>
+          )}
         </div>
       ) : null}
 

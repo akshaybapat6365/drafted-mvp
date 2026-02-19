@@ -1,6 +1,6 @@
 export type ApiResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string; status?: number; code?: string };
+  | { ok: false; error: string; status?: number; code?: string; attempts?: number };
 
 export type ApiRequestInit = RequestInit & {
   timeoutMs?: number;
@@ -183,6 +183,7 @@ export async function apiJson<T>(
           status: res.status,
           code: extractErrorCode(data),
           error: extractErrorMessage(data, res.status),
+          attempts: attempt + 1,
         };
       }
       return { ok: true, data: data as T };
@@ -198,6 +199,7 @@ export async function apiJson<T>(
           ok: false,
           code: "timeout",
           error: `Request timed out after ${timeoutMs}ms.`,
+          attempts: attempt + 1,
         };
       }
       if (isNetworkError(e)) {
@@ -206,11 +208,13 @@ export async function apiJson<T>(
           code: "network",
           error:
             "Network error reaching API. Ensure web and API services are running.",
+          attempts: attempt + 1,
         };
       }
       return {
         ok: false,
         error: e instanceof Error ? e.message : "Unknown error",
+        attempts: attempt + 1,
       };
     } finally {
       clearTimeout(timeoutId);
@@ -222,5 +226,6 @@ export async function apiJson<T>(
     ok: false,
     code: "retry_exhausted",
     error: "Request failed after retry attempts were exhausted.",
+    attempts: retries + 1,
   };
 }
