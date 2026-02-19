@@ -110,6 +110,13 @@ a {
 }
 
 @layer base {
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono), monospace;
+  }
+
   h1,
   h2,
   h3,

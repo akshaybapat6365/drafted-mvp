@@ -17,7 +17,7 @@ import {
   StatusPill,
 } from "@/components/ui";
 import { apiJson } from "@/lib/api";
-import type { JobOut, ProviderMode, SessionOut } from "@/types/api";
+import type { HealthOut, JobOut, ProviderMode, SessionOut } from "@/types/api";
 
 type JobFilter = "all" | "running" | "succeeded" | "failed";
 
@@ -34,8 +34,12 @@ export default function StudioPage() {
   const [jobFilter, setJobFilter] = useState<JobFilter>("all");
   const [jobSearch, setJobSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorRetryable, setErrorRetryable] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [providerMode, setProviderMode] = useState<ProviderMode | "unknown">("unknown");
 
   const sortedSessions = useMemo(
@@ -76,47 +80,78 @@ export default function StudioPage() {
       return (
         job.prompt.toLowerCase().includes(q) ||
         job.style.toLowerCase().includes(q) ||
-        job.id.toLowerCase().includes(q)
+        job.id.toLowerCase().includes(q) ||
+        job.status.toLowerCase().includes(q) ||
+        job.stage.toLowerCase().includes(q)
       );
     });
   }, [jobs, jobFilter, jobSearch]);
 
+  function isRetryable(status?: number): boolean {
+    if (!status) return false;
+    return status === 408 || status === 425 || status === 429 || status >= 500;
+  }
+
   async function refresh() {
-    setLoading(true);
+    const firstLoad = sessions.length === 0 && jobs.length === 0;
+    if (firstLoad) setLoading(true);
+    else setRefreshing(true);
     setError(null);
-    const r = await apiJson<SessionOut[]>("/api/v1/sessions");
+    setErrorCode(null);
+    setErrorRetryable(false);
+
+    const [r, j] = await Promise.all([
+      apiJson<SessionOut[]>("/api/v1/sessions", { retries: 1 }),
+      apiJson<JobOut[]>("/api/v1/jobs", { retries: 1 }),
+    ]);
+
     if (!r.ok) {
       setLoading(false);
+      setRefreshing(false);
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryable(r.status));
       setError(r.status === 401 ? "Please log in to continue." : r.error);
       setSessions([]);
       setJobs([]);
       return;
     }
     setSessions(r.data);
-
-    const j = await apiJson<JobOut[]>("/api/v1/jobs");
-    setLoading(false);
     if (!j.ok) {
-      setJobs([]);
+      setLoading(false);
+      setRefreshing(false);
+      setErrorCode(j.code ?? null);
+      setErrorRetryable(isRetryable(j.status));
+      setError("Session data refreshed, but jobs could not be loaded.");
+      setLastSyncedAt(new Date().toISOString());
       return;
     }
     setJobs(j.data);
+    setLastSyncedAt(new Date().toISOString());
+    setLoading(false);
+    setRefreshing(false);
   }
 
   async function refreshHealth() {
-    const h = await apiJson<{ provider_mode: ProviderMode }>("/api/v1/system/health");
+    const h = await apiJson<HealthOut>("/api/v1/system/health", { retries: 1 });
     if (h.ok) setProviderMode(h.data.provider_mode);
   }
 
   async function createSession() {
     setCreating(true);
     setError(null);
+    setErrorCode(null);
+    setErrorRetryable(false);
     const r = await apiJson<SessionOut>("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify({ title: "My Studio" }),
+      retries: 1,
     });
     setCreating(false);
-    if (!r.ok) return setError(r.error);
+    if (!r.ok) {
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryable(r.status));
+      return setError(r.error);
+    }
     await refresh();
   }
 
@@ -126,6 +161,8 @@ export default function StudioPage() {
       void refreshHealth();
     }, 0);
     return () => clearTimeout(t);
+    // Initial boot fetch only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -138,11 +175,24 @@ export default function StudioPage() {
           description="Track run health, filter your queue instantly, and branch new drafts from active sessions."
           actions={
             <>
-              <Badge tone={providerMode === "gemini" ? "success" : "warning"}>
+              <Badge
+                tone={
+                  providerMode === "gemini"
+                    ? "success"
+                    : providerMode === "mock"
+                      ? "warning"
+                      : "neutral"
+                }
+              >
                 provider: {providerMode}
               </Badge>
-              <Button variant="secondary" size="md" onClick={refresh} disabled={loading}>
-                {loading ? "Refreshing..." : "Refresh"}
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={refresh}
+                disabled={loading || refreshing}
+              >
+                {loading || refreshing ? "Refreshing..." : "Refresh"}
               </Button>
               <Button variant="primary" size="md" onClick={createSession} disabled={creating}>
                 {creating ? "Creating..." : "New session"}
@@ -156,6 +206,8 @@ export default function StudioPage() {
         <FadeSlideIn delay={0.05}>
           <ErrorPanel
             message={error}
+            code={errorCode}
+            retryable={errorRetryable}
             action={
               error.includes("log in") ? (
                 <Link className="font-semibold underline" href="/login">
@@ -165,6 +217,12 @@ export default function StudioPage() {
             }
           />
         </FadeSlideIn>
+      ) : null}
+
+      {lastSyncedAt ? (
+        <div className="text-xs uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
+          Last sync: {new Date(lastSyncedAt).toLocaleString()}
+        </div>
       ) : null}
 
       <StaggerGroup className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" delay={0.06}>

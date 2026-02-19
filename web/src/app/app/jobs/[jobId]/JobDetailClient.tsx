@@ -22,9 +22,13 @@ import {
   Timeline,
 } from "@/components/ui";
 import { apiJson } from "@/lib/api";
-import type { ArtifactsOut, ArtifactOut, JobOut, ProviderMode } from "@/types/api";
-
-type SystemHealthOut = { provider_mode: ProviderMode };
+import type {
+  ArtifactsOut,
+  ArtifactOut,
+  HealthOut,
+  JobOut,
+  ProviderMode,
+} from "@/types/api";
 
 function sizeLabel(bytes: number | null): string {
   if (!bytes || bytes <= 0) return "n/a";
@@ -47,11 +51,30 @@ function durationLabel(seconds: number): string {
   return `${hours}h ${remMinutes}m`;
 }
 
+function parseIsoMs(value: string): number | null {
+  const hasOffset = /(?:z|[+-]\d{2}:\d{2})$/i.test(value);
+  const normalized = hasOffset ? value : `${value}Z`;
+  const parsed = Date.parse(normalized);
+  if (Number.isFinite(parsed)) return parsed;
+  const fallback = Date.parse(value);
+  if (Number.isFinite(fallback)) return fallback;
+  return null;
+}
+
 function elapsedSeconds(fromIso: string, toIso: string): number {
-  const start = new Date(fromIso).getTime();
-  const end = new Date(toIso).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 0;
+  const start = parseIsoMs(fromIso);
+  const end = parseIsoMs(toIso);
+  if (start === null || end === null || end <= start) return 0;
   return Math.round((end - start) / 1000);
+}
+
+function isRetryableStatus(status?: number): boolean {
+  if (!status) return false;
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+function isTerminalStatus(status: string): boolean {
+  return status === "succeeded" || status === "failed";
 }
 
 export default function JobDetailClient({ jobId }: { jobId: string }) {
@@ -61,8 +84,13 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [artifacts, setArtifacts] = useState<ArtifactOut[]>([]);
   const [providerMode, setProviderMode] = useState<ProviderMode | "unknown">("unknown");
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorRetryable, setErrorRetryable] = useState(false);
+  const [artifactsError, setArtifactsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [pollMs, setPollMs] = useState(1100);
   const [regenerating, setRegenerating] = useState(false);
   const [retryingFailed, setRetryingFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -84,7 +112,11 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     if (!job) return [];
     return Object.entries(job.stage_timestamps)
       .map(([stage, at]) => ({ stage, at }))
-      .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+      .sort((a, b) => {
+        const safeA = parseIsoMs(a.at) ?? 0;
+        const safeB = parseIsoMs(b.at) ?? 0;
+        return safeA - safeB;
+      });
   }, [job]);
 
   const runTime = useMemo(() => {
@@ -94,42 +126,74 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   const stageDurations = useMemo(() => {
     if (!job || timelineItems.length === 0) return [];
+    let remaining = runTime;
     return timelineItems.map((item, index) => {
       const next = timelineItems[index + 1];
       const endAt = next ? next.at : job.updated_at;
+      const raw = elapsedSeconds(item.at, endAt);
+      const seconds = Math.max(0, Math.min(raw, remaining));
+      remaining = Math.max(0, remaining - seconds);
       return {
         stage: item.stage,
-        seconds: elapsedSeconds(item.at, endAt),
+        seconds,
       };
     });
-  }, [job, timelineItems]);
+  }, [job, timelineItems, runTime]);
+  const accountedStageSeconds = useMemo(
+    () => stageDurations.reduce((acc, item) => acc + item.seconds, 0),
+    [stageDurations],
+  );
+  const unaccountedStageSeconds = Math.max(0, runTime - accountedStageSeconds);
+  const terminal = job ? isTerminalStatus(job.status) : false;
 
   async function refreshHealth() {
-    const h = await apiJson<SystemHealthOut>("/api/v1/system/health");
+    const h = await apiJson<HealthOut>("/api/v1/system/health", { retries: 1 });
     if (h.ok) setProviderMode(h.data.provider_mode);
   }
 
-  async function refresh() {
-    setError(null);
-    const r = await apiJson<JobOut>(`/api/v1/jobs/${encodeURIComponent(jobId)}`);
+  async function refresh(options?: { interactive?: boolean }) {
+    const interactive = options?.interactive ?? false;
+    if (interactive) setRefreshing(true);
+    if (!job) setLoading(true);
+    setArtifactsError(null);
+
+    const r = await apiJson<JobOut>(`/api/v1/jobs/${encodeURIComponent(jobId)}`, {
+      retries: 1,
+    });
     if (!r.ok) {
       setLoading(false);
+      setRefreshing(false);
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryableStatus(r.status));
       setError(r.status === 401 ? "Please log in to view this job." : r.error);
+      setPollMs((current) => Math.min(current * 2, 10_000));
       return;
     }
 
+    setPollMs(1100);
+    setError(null);
+    setErrorCode(null);
+    setErrorRetryable(false);
     setJob(r.data);
     setLoading(false);
+    setRefreshing(false);
 
     if (r.data.status === "failed" && r.data.error) {
       setError(r.data.error);
     }
 
-    if (r.data.status === "succeeded" || r.data.status === "failed") {
+    if (isTerminalStatus(r.data.status)) {
       const a = await apiJson<ArtifactsOut>(
         `/api/v1/jobs/${encodeURIComponent(jobId)}/artifacts`,
+        { retries: 1 },
       );
-      if (a.ok) setArtifacts(a.data.items);
+      if (a.ok) {
+        setArtifacts(a.data.items);
+      } else {
+        setErrorCode(a.code ?? null);
+        setErrorRetryable(isRetryableStatus(a.status));
+        setArtifactsError(a.error);
+      }
       return;
     }
     setArtifacts([]);
@@ -137,6 +201,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   async function regenerate() {
     setError(null);
+    setErrorCode(null);
+    setErrorRetryable(false);
     setRegenerating(true);
     const r = await apiJson<JobOut>(
       `/api/v1/jobs/${encodeURIComponent(jobId)}/regenerate`,
@@ -147,6 +213,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     );
     setRegenerating(false);
     if (!r.ok) {
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryableStatus(r.status));
       setError(r.error);
       return;
     }
@@ -155,6 +223,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   async function retryFailedStage() {
     setError(null);
+    setErrorCode(null);
+    setErrorRetryable(false);
     setRetryingFailed(true);
     const r = await apiJson<JobOut>(
       `/api/v1/jobs/${encodeURIComponent(jobId)}/regenerate`,
@@ -165,6 +235,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     );
     setRetryingFailed(false);
     if (!r.ok) {
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryableStatus(r.status));
       setError(r.error);
       return;
     }
@@ -173,16 +245,21 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   async function exportArtifacts() {
     setError(null);
+    setErrorCode(null);
+    setErrorRetryable(false);
     setExporting(true);
     const r = await apiJson<{ url: string }>(
       `/api/v1/jobs/${encodeURIComponent(jobId)}/export`,
       {
         method: "POST",
         body: JSON.stringify({}),
+        retries: 1,
       },
     );
     setExporting(false);
     if (!r.ok) {
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryableStatus(r.status));
       setError(r.error);
       return;
     }
@@ -207,7 +284,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   useEffect(() => {
     let mounted = true;
-    void refresh();
+    void refresh({ interactive: false });
     void refreshHealth();
 
     if (!autoRefresh) {
@@ -218,15 +295,19 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
     const intervalId = setInterval(() => {
       if (!mounted) return;
-      void refresh();
-    }, 1100);
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+      if (job && isTerminalStatus(job.status)) return;
+      void refresh({ interactive: false });
+    }, pollMs);
 
     return () => {
       mounted = false;
       clearInterval(intervalId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, autoRefresh]);
+  }, [jobId, autoRefresh, pollMs, job?.status]);
 
   return (
     <div className="grid gap-8">
@@ -238,7 +319,15 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           description={job ? `Job ${job.id} is ${job.status} at stage ${job.stage}.` : `Loading job ${jobId}.`}
           actions={
             <>
-              <Badge tone={providerMode === "gemini" ? "success" : "warning"}>
+              <Badge
+                tone={
+                  providerMode === "gemini"
+                    ? "success"
+                    : providerMode === "mock"
+                      ? "warning"
+                      : "neutral"
+                }
+              >
                 provider: {providerMode}
               </Badge>
               <Button
@@ -255,8 +344,15 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                     ? "Copy failed"
                     : "Copy job ID"}
               </Button>
-              <Button variant="secondary" size="md" onClick={refresh} disabled={loading}>
-                {loading ? "Refreshing..." : "Refresh"}
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  void refresh({ interactive: true });
+                }}
+                disabled={loading || refreshing}
+              >
+                {loading || refreshing ? "Refreshing..." : "Refresh"}
               </Button>
               <Button variant="secondary" size="md" onClick={regenerate} disabled={regenerating}>
                 {regenerating ? "Regenerating..." : "Regenerate"}
@@ -271,7 +367,12 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                   {retryingFailed ? "Retrying..." : "Retry failed stage"}
                 </Button>
               ) : null}
-              <Button variant="primary" size="md" onClick={exportArtifacts} disabled={exporting}>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={exportArtifacts}
+                disabled={exporting || !terminal}
+              >
                 {exporting ? "Exporting..." : "Export zip"}
               </Button>
             </>
@@ -283,6 +384,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         <FadeSlideIn delay={0.05}>
           <ErrorPanel
             message={error}
+            code={errorCode}
+            retryable={errorRetryable}
             action={
               error.includes("log in") ? (
                 <Link className="font-semibold underline" href="/login">
@@ -445,6 +548,11 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                     </div>
                   ))}
                 </div>
+                {unaccountedStageSeconds > 2 ? (
+                  <div className="mt-3 rounded-xl border border-[color-mix(in srgb,var(--color-warning) 52%,transparent)] bg-[color-mix(in srgb,var(--color-warning) 14%,transparent)] px-3 py-2 text-xs text-[var(--color-warning)]">
+                    Timeline appears incomplete by {durationLabel(unaccountedStageSeconds)}.
+                  </div>
+                ) : null}
 
                 <div className="mt-4 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3 text-xs text-[var(--color-ink-muted)]">
                   Job ID: <code>{jobId}</code>
@@ -516,6 +624,15 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               <Card className="p-6" tone="frost">
                 <div className="text-tech">Artifact manifest</div>
                 <div className="soft-divider mt-4" />
+                {artifactsError ? (
+                  <div className="mt-4">
+                    <ErrorPanel
+                      message={artifactsError}
+                      code={errorCode}
+                      retryable={errorRetryable}
+                    />
+                  </div>
+                ) : null}
                 <div className="mt-4 grid gap-3">
                   {artifacts.length === 0 ? (
                     <EmptyState

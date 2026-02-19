@@ -35,7 +35,7 @@ export function Timeline({
               {humanizeStage(item.stage)}
             </span>
             <span className="text-[var(--color-ink-muted)]">
-              {new Date(item.at).toLocaleString()}
+              {displayAt(item.at)}
             </span>
           </li>
         );
@@ -48,4 +48,18 @@ function humanizeStage(raw: string): string {
   return raw
     .replaceAll("_", " ")
     .replace(/(^\w)|(\s\w)/g, (match) => match.toUpperCase());
+}
+
+function displayAt(raw: string): string {
+  const hasOffset = /(?:z|[+-]\d{2}:\d{2})$/i.test(raw);
+  const normalized = hasOffset ? raw : `${raw}Z`;
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleString();
+  }
+  const fallback = new Date(raw);
+  if (!Number.isNaN(fallback.getTime())) {
+    return fallback.toLocaleString();
+  }
+  return raw;
 }

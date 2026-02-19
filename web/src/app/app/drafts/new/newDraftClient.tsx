@@ -105,6 +105,8 @@ export default function NewDraftClient({
   const [wantExteriorImage, setWantExteriorImage] = useState(true);
   const [idempotencyKey, setIdempotencyKey] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorRetryable, setErrorRetryable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const selectedSession = useMemo(
@@ -117,6 +119,25 @@ export default function NewDraftClient({
   const roomMixInvalid = bathrooms > bedrooms + 2;
   const submitDisabled =
     submitting || !normalizedPrompt || promptTooShort || roomMixInvalid;
+  const submitDisabledReason = submitting
+    ? "A submit is already in progress."
+    : !normalizedPrompt
+      ? "Prompt is required."
+      : promptTooShort
+        ? "Prompt should be at least 24 characters."
+        : roomMixInvalid
+          ? "Bathrooms cannot exceed bedrooms by more than 2."
+          : null;
+
+  function isRetryable(status?: number): boolean {
+    if (!status) return false;
+    return status === 408 || status === 425 || status === 429 || status >= 500;
+  }
+
+  function clampInt(value: number, fallback: number): number {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(10, Math.max(1, Math.floor(value)));
+  }
 
   const requestPreview = useMemo(
     () =>
@@ -127,7 +148,7 @@ export default function NewDraftClient({
           bathrooms,
           style,
           want_exterior_image: wantExteriorImage,
-          idempotency_key: idempotencyKey || null,
+          idempotency_key: idempotencyKey.trim().slice(0, 80) || null,
           priority: "normal",
         },
         null,
@@ -144,8 +165,12 @@ export default function NewDraftClient({
   );
 
   async function loadSessions() {
-    const r = await apiJson<SessionOut[]>("/api/v1/sessions");
+    setErrorCode(null);
+    setErrorRetryable(false);
+    const r = await apiJson<SessionOut[]>("/api/v1/sessions", { retries: 1 });
     if (!r.ok) {
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryable(r.status));
       setError(r.status === 401 ? "Please log in to draft." : r.error);
       return;
     }
@@ -158,8 +183,11 @@ export default function NewDraftClient({
     const r = await apiJson<SessionOut>("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify({ title: "My Studio" }),
+      retries: 1,
     });
     if (!r.ok) {
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryable(r.status));
       setError(r.error);
       return null;
     }
@@ -169,7 +197,10 @@ export default function NewDraftClient({
 
   async function submit() {
     setError(null);
+    setErrorCode(null);
+    setErrorRetryable(false);
     setSubmitting(true);
+    const normalizedIdempotencyKey = idempotencyKey.trim().slice(0, 80);
     const sid = await ensureSession();
     if (!sid) {
       setSubmitting(false);
@@ -186,13 +217,16 @@ export default function NewDraftClient({
           bathrooms,
           style,
           want_exterior_image: wantExteriorImage,
-          idempotency_key: idempotencyKey || null,
+          idempotency_key: normalizedIdempotencyKey || null,
           priority: "normal",
         }),
+        retries: normalizedIdempotencyKey ? 1 : 0,
       },
     );
     setSubmitting(false);
     if (!r.ok) {
+      setErrorCode(r.code ?? null);
+      setErrorRetryable(isRetryable(r.status));
       setError(r.error);
       return;
     }
@@ -257,6 +291,8 @@ export default function NewDraftClient({
         <FadeSlideIn delay={0.05}>
           <ErrorPanel
             message={error}
+            code={errorCode}
+            retryable={errorRetryable}
             action={
               error.includes("log in") ? (
                 <Link className="font-semibold underline" href="/login">
@@ -364,7 +400,9 @@ export default function NewDraftClient({
                   min={1}
                   max={10}
                   value={bedrooms}
-                  onChange={(e) => setBedrooms(parseInt(e.target.value || "3", 10))}
+                  onChange={(e) =>
+                    setBedrooms(clampInt(Number(e.target.value || "3"), 3))
+                  }
                 />
               </label>
 
@@ -376,7 +414,9 @@ export default function NewDraftClient({
                   min={1}
                   max={10}
                   value={bathrooms}
-                  onChange={(e) => setBathrooms(parseInt(e.target.value || "2", 10))}
+                  onChange={(e) =>
+                    setBathrooms(clampInt(Number(e.target.value || "2"), 2))
+                  }
                 />
               </label>
 
@@ -386,7 +426,7 @@ export default function NewDraftClient({
                   <input
                     className="input-base"
                     value={idempotencyKey}
-                    onChange={(e) => setIdempotencyKey(e.target.value)}
+                    onChange={(e) => setIdempotencyKey(e.target.value.slice(0, 80))}
                     placeholder="Optional key for deduplicating repeated submits"
                   />
                   <Button
@@ -431,7 +471,8 @@ export default function NewDraftClient({
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-xs text-[var(--color-ink-muted)]">
-                401 responses indicate expired auth and require re-login.
+                {submitDisabledReason ??
+                  "401 responses indicate expired auth and require re-login."}
               </div>
               <Button disabled={submitDisabled} onClick={submit} size="lg">
                 {submitting ? "Submitting..." : "Create draft job"}

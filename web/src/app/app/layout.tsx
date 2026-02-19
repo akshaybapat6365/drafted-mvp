@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ThemeToggle } from "@/components/ui";
 import LogoutButton from "./LogoutButton";
+import RuntimeModeBadge from "./RuntimeModeBadge";
 
 const navItemBase =
   "nav-pill border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]";
@@ -30,12 +31,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link className={navItemPrimary} href="/app/drafts/new">
               Launch Draft
             </Link>
+            <RuntimeModeBadge />
             <ThemeToggle />
             <LogoutButton />
           </nav>
         </div>
         <div className="mx-auto w-full max-w-6xl px-6 pb-3 text-[11px] uppercase tracking-[0.09em] text-[var(--color-ink-muted)]">
-          Online pipeline only: deterministic geometry in-app, generative rendering through API.
+          Runtime-aware pipeline: Firebase + Gemini primary, local mock fallback for recovery.
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl px-6 py-8 md:py-10">{children}</main>

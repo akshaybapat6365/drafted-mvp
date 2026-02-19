@@ -1,5 +1,16 @@
 export type ProviderMode = "mock" | "gemini";
 
+export type HealthOut = {
+  ok?: boolean;
+  provider_mode: ProviderMode;
+  queue?: {
+    queued?: number;
+    running?: number;
+    failed_last_24h?: number;
+    succeeded_last_24h?: number;
+  };
+};
+
 export type SessionOut = {
   id: string;
   title: string;
