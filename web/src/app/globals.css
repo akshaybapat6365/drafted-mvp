@@ -109,6 +109,40 @@ a {
   color: inherit;
 }
 
+.skip-link {
+  position: fixed;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 100;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-strong);
+  color: var(--color-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.8rem;
+  transform: translateY(-220%);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @layer base {
   code,
   pre,
@@ -238,6 +272,11 @@ a {
     transform: translateY(-1px);
   }
 
+  .nav-pill:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 30%, transparent);
+  }
+
   .input-base,
   .select-base,
   .textarea-base {
@@ -274,6 +313,13 @@ a {
   .textarea-base:focus {
     border-color: var(--color-ring);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ring) 28%, transparent);
+  }
+
+  .input-base[aria-invalid="true"],
+  .select-base[aria-invalid="true"],
+  .textarea-base[aria-invalid="true"] {
+    border-color: color-mix(in srgb, var(--color-danger) 75%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 20%, transparent);
   }
 
   .soft-divider {
@@ -326,5 +372,11 @@ a {
   .reveal {
     opacity: 1;
     transform: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .display-hero {
+    line-height: 0.94;
   }
 }

@@ -7,6 +7,8 @@ ENV_FILE="${ENV_FILE:-${ROOT_DIR}/deploy/env/.env.prod}"
 ENV_TEMPLATE="${ENV_TEMPLATE:-${ROOT_DIR}/deploy/env/.env.example}"
 PROJECT_NAME="${PROJECT_NAME:-drafted}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+API_HOST_PORT="${API_HOST_PORT:-18000}"
+WEB_HOST_PORT="${WEB_HOST_PORT:-13000}"
 
 BASELINE_DURATION="${BASELINE_DURATION:-3m}"
 BASELINE_VUS="${BASELINE_VUS:-8}"
@@ -65,9 +67,15 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   cp "${ENV_TEMPLATE}" "${ENV_FILE}"
 fi
 upsert_env "DRAFTED_DOMAIN" "localhost"
-upsert_env "API_BASE_URL" "http://localhost"
-upsert_env "WEB_BASE_URL" "http://localhost"
-upsert_env "CORS_ORIGINS" "http://localhost,http://127.0.0.1:3000"
+upsert_env "API_BASE_URL" "http://127.0.0.1:${API_HOST_PORT}"
+upsert_env "WEB_BASE_URL" "http://127.0.0.1:${WEB_HOST_PORT}"
+upsert_env "CORS_ORIGINS" "http://localhost,http://127.0.0.1:${WEB_HOST_PORT}"
+upsert_env "NEXT_PUBLIC_FIREBASE_API_KEY" "placeholder-key"
+upsert_env "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" "placeholder.firebaseapp.com"
+upsert_env "NEXT_PUBLIC_FIREBASE_PROJECT_ID" "placeholder-project"
+upsert_env "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET" "placeholder.appspot.com"
+upsert_env "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID" "000000000000"
+upsert_env "NEXT_PUBLIC_FIREBASE_APP_ID" "1:000000000000:web:placeholder"
 upsert_env "GEMINI_API_KEY" ""
 upsert_env "TRANSIENT_STUB_ENABLED" "false"
 upsert_env "TRANSIENT_STUB_FAIL_FIRST_N" "0"
@@ -75,11 +83,21 @@ upsert_env "TRANSIENT_STUB_FAIL_EVERY_N" "0"
 upsert_env "TRANSIENT_STUB_HTTP_CODE" "503"
 upsert_env "TRANSIENT_STUB_SCOPE" "spec"
 
+echo "[prebeta] static parity and isolation checks"
+bash "${ROOT_DIR}/scripts/validate_firebase_env_parity.sh" \
+  | tee "${REPORT_ROOT}/firebase-env-parity.txt"
+bash "${ROOT_DIR}/scripts/check_firestore_isolation.sh" \
+  | tee "${REPORT_ROOT}/firestore-isolation.txt"
+"${PYTHON_BIN}" "${ROOT_DIR}/scripts/check_endpoint_parity.py" \
+  | tee "${REPORT_ROOT}/endpoint-parity.txt"
+
 echo "[prebeta] compose up"
+export API_HOST_PORT
+export WEB_HOST_PORT
 compose up -d --build | tee "${COMPOSE_REPORT_DIR}/up.txt"
-HEALTH_URL="http://127.0.0.1:8000/api/v1/system/health" MAX_ATTEMPTS=80 SLEEP_SECONDS=2 \
+HEALTH_URL="http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health" MAX_ATTEMPTS=80 SLEEP_SECONDS=2 \
   bash "${ROOT_DIR}/deploy/scripts/health_gate.sh" | tee "${COMPOSE_REPORT_DIR}/health-gate.txt"
-curl -fsS "http://127.0.0.1:8000/api/v1/system/health" > "${COMPOSE_REPORT_DIR}/health-initial.json"
+curl -fsS "http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health" > "${COMPOSE_REPORT_DIR}/health-initial.json"
 
 echo "[prebeta] api tests"
 (
@@ -89,7 +107,7 @@ echo "[prebeta] api tests"
 
 echo "[prebeta] baseline load run + failure injection sequence"
 (
-  BASE_URL="http://127.0.0.1:8000" DURATION="${BASELINE_DURATION}" VUS="${BASELINE_VUS}" \
+  BASE_URL="http://127.0.0.1:${API_HOST_PORT}" DURATION="${BASELINE_DURATION}" VUS="${BASELINE_VUS}" \
     k6 run "${ROOT_DIR}/tests/load/k6_jobs.js"
 ) | tee "${LOAD_REPORT_DIR}/k6-baseline.txt" &
 K6_BASE_PID=$!
@@ -116,7 +134,7 @@ INJECT_PID=$!
 (
   for _ in $(seq 1 10); do
     ts="$(date -u +%Y%m%dT%H%M%SZ)"
-    curl -fsS "http://127.0.0.1:8000/api/v1/system/health" > "${FAILURE_REPORT_DIR}/health-${ts}.json"
+    curl -fsS "http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health" > "${FAILURE_REPORT_DIR}/health-${ts}.json"
     sleep 20
   done
 ) &
@@ -125,7 +143,7 @@ HEALTH_LOOP_PID=$!
 wait "${INJECT_PID}"
 wait "${HEALTH_LOOP_PID}"
 wait "${K6_BASE_PID}"
-curl -fsS "http://127.0.0.1:8000/api/v1/system/health" > "${FAILURE_REPORT_DIR}/health-post-faults.json"
+curl -fsS "http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health" > "${FAILURE_REPORT_DIR}/health-post-faults.json"
 
 echo "[prebeta] transient stub stress run"
 upsert_env "TRANSIENT_STUB_ENABLED" "true"
@@ -134,12 +152,12 @@ upsert_env "TRANSIENT_STUB_FAIL_EVERY_N" "${TRANSIENT_FAIL_EVERY_N}"
 upsert_env "TRANSIENT_STUB_HTTP_CODE" "${TRANSIENT_HTTP_CODE}"
 upsert_env "TRANSIENT_STUB_SCOPE" "spec"
 compose up -d --force-recreate api worker | tee "${TRANSIENT_REPORT_DIR}/api-worker-recreate.txt"
-HEALTH_URL="http://127.0.0.1:8000/api/v1/system/health" MAX_ATTEMPTS=80 SLEEP_SECONDS=2 \
+HEALTH_URL="http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health" MAX_ATTEMPTS=80 SLEEP_SECONDS=2 \
   bash "${ROOT_DIR}/deploy/scripts/health_gate.sh" | tee "${TRANSIENT_REPORT_DIR}/health-gate-after-recreate.txt"
-curl -fsS "http://127.0.0.1:8000/api/v1/system/health" > "${TRANSIENT_REPORT_DIR}/health-after-recreate.json"
+curl -fsS "http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health" > "${TRANSIENT_REPORT_DIR}/health-after-recreate.json"
 
 (
-  BASE_URL="http://127.0.0.1:8000" DURATION="${TRANSIENT_DURATION}" VUS="${TRANSIENT_VUS}" \
+  BASE_URL="http://127.0.0.1:${API_HOST_PORT}" DURATION="${TRANSIENT_DURATION}" VUS="${TRANSIENT_VUS}" \
     k6 run "${ROOT_DIR}/tests/load/k6_jobs_transient.js"
 ) | tee "${TRANSIENT_REPORT_DIR}/k6-transient.txt"
 

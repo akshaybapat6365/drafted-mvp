@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db import SessionLocal
+from ..logging import log_event
 from ..models import (
     Artifact,
     HouseSpec as HouseSpecRow,
@@ -207,6 +208,7 @@ def process_job(db: Session, job: Job) -> None:
         return
     if job.status != "running":
         job.status = "running"
+    log_event("worker", "job_started", job_id=job.id, retry_count=job.retry_count)
     _set_stage(job, "spec")
     job.failure_code = None
     job.error = None
@@ -330,6 +332,7 @@ def process_job(db: Session, job: Job) -> None:
     job.status = "succeeded"
     _set_stage(job, "done")
     db.commit()
+    log_event("worker", "job_succeeded", job_id=job.id, retry_count=job.retry_count)
 
 
 def _claim_next_job(db: Session) -> Job | None:
@@ -379,9 +382,25 @@ def worker_loop(*, poll_interval_s: float = 1.0, stop_event: threading.Event | N
                     job.retry_count += 1
                     job.status = "queued"
                     _set_stage(job, "retry_wait")
+                    log_event(
+                        "worker",
+                        "job_retry_scheduled",
+                        job_id=job.id,
+                        retry_count=job.retry_count,
+                        failure_code=code,
+                        error_type=type(e).__name__,
+                    )
                 else:
                     job.status = "failed"
                     _set_stage(job, "done")
+                    log_event(
+                        "worker",
+                        "job_failed",
+                        job_id=job.id,
+                        retry_count=job.retry_count,
+                        failure_code=code,
+                        error_type=type(e).__name__,
+                    )
                 db.commit()
                 _write_worker_heartbeat(
                     state="error",

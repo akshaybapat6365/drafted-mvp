@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { firebaseAuth } from "@/lib/firebaseClient";
 import { apiJson } from "@/lib/api";
+import { emitTelemetry } from "@/lib/telemetry";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -57,8 +58,19 @@ export default function LoginPage() {
         setErrorRetryable(isRetryable(r.status));
         setErrorAttempts(r.attempts ?? null);
         setError(r.status === 401 ? "Invalid email or password." : r.error);
+        emitTelemetry({
+          event_name: "login_failed",
+          page: "/login",
+          status: "error",
+          metadata: {
+            code: r.code ?? null,
+            attempts: r.attempts ?? null,
+            request_id: r.requestId ?? null,
+          },
+        });
         return;
       }
+      emitTelemetry({ event_name: "login_succeeded", page: "/login", status: "success" });
       router.push("/app");
       return;
     }
@@ -67,9 +79,16 @@ export default function LoginPage() {
     } catch (e) {
       setLoading(false);
       setError(toAuthMessage(e));
+      emitTelemetry({
+        event_name: "login_failed",
+        page: "/login",
+        status: "error",
+        metadata: { provider: "firebase_email" },
+      });
       return;
     }
     setLoading(false);
+    emitTelemetry({ event_name: "login_succeeded", page: "/login", status: "success" });
     router.push("/app");
   }
 
@@ -80,6 +99,12 @@ export default function LoginPage() {
     setErrorAttempts(null);
     if (!firebaseEnabled) {
       setError("Google sign-in is unavailable because Firebase auth is not configured.");
+      emitTelemetry({
+        event_name: "login_failed",
+        page: "/login",
+        status: "error",
+        metadata: { provider: "google", reason: "firebase_not_configured" },
+      });
       return;
     }
     setGoogleLoading(true);
@@ -88,9 +113,21 @@ export default function LoginPage() {
     } catch (e) {
       setGoogleLoading(false);
       setError(toAuthMessage(e));
+      emitTelemetry({
+        event_name: "login_failed",
+        page: "/login",
+        status: "error",
+        metadata: { provider: "google" },
+      });
       return;
     }
     setGoogleLoading(false);
+    emitTelemetry({
+      event_name: "login_succeeded",
+      page: "/login",
+      status: "success",
+      metadata: { provider: "google" },
+    });
     router.push("/app");
   }
 
@@ -128,10 +165,14 @@ export default function LoginPage() {
               </div>
             ) : null}
 
-            <form className="mt-6 grid gap-4" onSubmit={onSubmit}>
+            <form className="mt-6 grid gap-4" onSubmit={onSubmit} aria-describedby="login-help">
+              <p id="login-help" className="sr-only">
+                Enter email and password, then submit to access the studio.
+              </p>
               <label className="grid gap-2 text-sm">
                 <span className="font-semibold text-[var(--color-ink)]">Email</span>
                 <input
+                  id="login-email"
                   className="input-base"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -145,6 +186,7 @@ export default function LoginPage() {
               <label className="grid gap-2 text-sm">
                 <span className="font-semibold text-[var(--color-ink)]">Password</span>
                 <input
+                  id="login-password"
                   className="input-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

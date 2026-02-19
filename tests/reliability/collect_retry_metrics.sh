@@ -24,6 +24,11 @@ sql() {
 SESSION_SQL="SELECT id FROM sessions WHERE title LIKE '${SESSION_PATTERN}'"
 
 sessions_total="$(sql "WITH s AS (${SESSION_SQL}) SELECT count(*) FROM s;")"
+if [[ "${sessions_total}" -eq 0 ]]; then
+  # Fallback to recent sessions when title filters are too restrictive or changed.
+  SESSION_SQL="SELECT id FROM sessions WHERE created_at >= NOW() - INTERVAL '6 hours'"
+  sessions_total="$(sql "WITH s AS (${SESSION_SQL}) SELECT count(*) FROM s;")"
+fi
 jobs_total="$(sql "WITH s AS (${SESSION_SQL}) SELECT count(*) FROM jobs WHERE session_id IN (SELECT id FROM s);")"
 jobs_succeeded="$(sql "WITH s AS (${SESSION_SQL}) SELECT count(*) FROM jobs WHERE session_id IN (SELECT id FROM s) AND status='succeeded';")"
 jobs_failed="$(sql "WITH s AS (${SESSION_SQL}) SELECT count(*) FROM jobs WHERE session_id IN (SELECT id FROM s) AND status='failed';")"

@@ -3,7 +3,24 @@ api/var/
 web/.next/
 web/node_modules/
 web/.turbo/
+functions/lib/
+functions/node_modules/
+.firebase/
+.runtimeconfig.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .DS_Store
+
+# Python cache/build artifacts
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local runtime/report artifacts
+var/
+qa-smoke-job.png
+web/test-results/
+web/playwright-report/
+web/playwright-html/

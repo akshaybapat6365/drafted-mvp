@@ -1,0 +1,35 @@
+groups:
+  - name: drafted-reliability
+    rules:
+      - alert: DraftedRetryAdherenceLow
+        expr: |
+          100 * sum(rate(drafted_retry_adhered_total[15m]))
+          / clamp_min(sum(rate(drafted_retryable_total[15m])), 1) < 99.5
+        for: 10m
+        labels:
+          severity: page
+          service: drafted
+        annotations:
+          summary: Retry adherence below 99.5%
+          runbook: docs/ops-runbook.md
+
+      - alert: DraftedApiP95High
+        expr: |
+          histogram_quantile(0.95, sum(rate(http_request_duration_ms_bucket{service="drafted-api"}[5m])) by (le)) > 1500
+        for: 15m
+        labels:
+          severity: warn
+          service: drafted
+        annotations:
+          summary: API p95 latency above 1500ms
+          runbook: docs/ops-runbook.md
+
+      - alert: DraftedQueueBacklogGrowing
+        expr: drafted_queue_jobs{status="queued"} > 200
+        for: 15m
+        labels:
+          severity: warn
+          service: drafted
+        annotations:
+          summary: Queue backlog above 200 queued jobs
+          runbook: docs/ops-runbook.md

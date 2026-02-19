@@ -1,7 +1,0 @@
-NAME                 IMAGE                COMMAND                  SERVICE    CREATED         STATUS                   PORTS
-drafted-api-1        drafted-api          "uvicorn app.main:ap…"   api        4 minutes ago   Up 4 minutes             127.0.0.1:8000->8000/tcp
-drafted-caddy-1      caddy:2.8-alpine     "caddy run --config …"   caddy      7 minutes ago   Up 7 minutes             0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp, 443/udp, 2019/tcp
-drafted-postgres-1   postgres:16-alpine   "docker-entrypoint.s…"   postgres   4 minutes ago   Up 4 minutes (healthy)   5432/tcp
-drafted-redis-1      redis:7-alpine       "docker-entrypoint.s…"   redis      7 minutes ago   Up 5 minutes (healthy)   6379/tcp
-drafted-web-1        drafted-web          "docker-entrypoint.s…"   web        7 minutes ago   Up 7 minutes             127.0.0.1:3000->3000/tcp
-drafted-worker-1     drafted-worker       "python -m app.jobs.…"   worker     4 minutes ago   Up 4 minutes             8000/tcp

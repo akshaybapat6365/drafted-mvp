@@ -204,3 +204,22 @@ def test_system_health_exposes_worker_heartbeat(tmp_path, monkeypatch):
         assert "worker" in body
         assert "heartbeat_age_seconds" in body["worker"]
         assert body["queue_backend"]["kind"] == "db_polling"
+
+
+def test_failure_class_matrix_is_stable():
+    from app.jobs import worker as worker_mod
+
+    req = httpx.Request("POST", "https://generativelanguage.googleapis.com")
+
+    transient = httpx.Response(503, request=req)
+    assert worker_mod._classify_failure(
+        httpx.HTTPStatusError("transient", request=req, response=transient)
+    ) == ("provider_transient", True)
+
+    permanent = httpx.Response(400, request=req)
+    assert worker_mod._classify_failure(
+        httpx.HTTPStatusError("permanent", request=req, response=permanent)
+    ) == ("provider_permanent", False)
+
+    assert worker_mod._classify_failure(ValueError("bad input")) == ("validation", False)
+    assert worker_mod._classify_failure(RuntimeError("boom")) == ("system", False)

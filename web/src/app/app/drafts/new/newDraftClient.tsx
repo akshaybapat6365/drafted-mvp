@@ -15,6 +15,14 @@ import {
   StaggerItem,
 } from "@/components/ui";
 import { apiJson } from "@/lib/api";
+import {
+  asError,
+  asLoading,
+  asSuccess,
+  initialAsyncState,
+  uiStateLabel,
+} from "@/lib/asyncState";
+import { emitTelemetry } from "@/lib/telemetry";
 import type { JobOut, SessionOut } from "@/types/api";
 
 type CreateJobOut = Pick<JobOut, "id" | "session_id" | "status" | "stage" | "error">;
@@ -91,6 +99,7 @@ export default function NewDraftClient({
   q: string | null;
 }) {
   const router = useRouter();
+  const [asyncState, setAsyncState] = useState(initialAsyncState());
 
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(sessionFromQuery);
@@ -166,6 +175,7 @@ export default function NewDraftClient({
   );
 
   async function loadSessions() {
+    setAsyncState((current) => asLoading(current));
     setErrorCode(null);
     setErrorRetryable(false);
     setErrorAttempts(null);
@@ -175,9 +185,11 @@ export default function NewDraftClient({
       setErrorRetryable(isRetryable(r.status));
       setErrorAttempts(r.attempts ?? null);
       setError(r.status === 401 ? "Please log in to draft." : r.error);
+      setAsyncState((current) => asError(r.error, current));
       return;
     }
     setSessions(r.data);
+    setAsyncState(asSuccess());
     if (!sessionId && r.data.length) setSessionId(r.data[0].id);
   }
 
@@ -193,13 +205,16 @@ export default function NewDraftClient({
       setErrorRetryable(isRetryable(r.status));
       setErrorAttempts(r.attempts ?? null);
       setError(r.error);
+      setAsyncState((current) => asError(r.error, current));
       return null;
     }
     setSessionId(r.data.id);
+    setAsyncState(asSuccess());
     return r.data.id;
   }
 
   async function submit() {
+    setAsyncState((current) => asLoading(current));
     setError(null);
     setErrorCode(null);
     setErrorRetryable(false);
@@ -234,8 +249,28 @@ export default function NewDraftClient({
       setErrorRetryable(isRetryable(r.status));
       setErrorAttempts(r.attempts ?? null);
       setError(r.error);
+      setAsyncState((current) => asError(r.error, current));
+      emitTelemetry({
+        event_name: "draft_submit_failed",
+        page: "/app/drafts/new",
+        status: "error",
+        metadata: {
+          code: r.code ?? null,
+          attempts: r.attempts ?? null,
+          request_id: r.requestId ?? null,
+        },
+      });
       return;
     }
+    setAsyncState(asSuccess());
+    emitTelemetry({
+      event_name: "draft_submit_succeeded",
+      page: "/app/drafts/new",
+      status: "success",
+      metadata: {
+        job_id: r.data.id,
+      },
+    });
     router.push(`/app/jobs/${encodeURIComponent(r.data.id)}`);
   }
 
@@ -273,7 +308,11 @@ export default function NewDraftClient({
   }, []);
 
   return (
-    <div className="grid gap-8">
+    <div
+      className="grid gap-8"
+      data-ui-state={uiStateLabel(asyncState)}
+      aria-busy={submitting}
+    >
       <FadeSlideIn>
         <SectionHeader
           kicker="Mission Setup"
@@ -344,8 +383,10 @@ export default function NewDraftClient({
                   className="textarea-base"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
+                  aria-invalid={promptTooShort}
+                  aria-describedby="prompt-help"
                 />
-                <span className="text-xs text-[var(--color-ink-muted)]">
+                <span id="prompt-help" className="text-xs text-[var(--color-ink-muted)]">
                   Include room relationships and circulation constraints for better outcomes.
                 </span>
               </label>
@@ -424,6 +465,8 @@ export default function NewDraftClient({
                   onChange={(e) =>
                     setBathrooms(clampInt(Number(e.target.value || "2"), 2))
                   }
+                  aria-invalid={roomMixInvalid}
+                  aria-describedby="roommix-help"
                 />
               </label>
 
@@ -435,6 +478,7 @@ export default function NewDraftClient({
                     value={idempotencyKey}
                     onChange={(e) => setIdempotencyKey(e.target.value.slice(0, 80))}
                     placeholder="Optional key for deduplicating repeated submits"
+                    aria-describedby="idempotency-help"
                   />
                   <Button
                     type="button"
@@ -445,6 +489,9 @@ export default function NewDraftClient({
                     Generate
                   </Button>
                 </div>
+                <span id="idempotency-help" className="text-xs text-[var(--color-ink-muted)]">
+                  Keep this key stable when manually retrying the same request payload.
+                </span>
               </label>
 
               <div className="md:col-span-2">
@@ -470,7 +517,7 @@ export default function NewDraftClient({
                 </div>
               ) : null}
               {roomMixInvalid ? (
-                <div className="text-[var(--color-warning)]">
+                <div id="roommix-help" className="text-[var(--color-warning)]">
                   Bathroom count is unusually high relative to bedrooms.
                 </div>
               ) : null}

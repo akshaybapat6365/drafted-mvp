@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               Blueprint Studio
             </span>
           </Link>
-          <nav className="flex flex-wrap items-center gap-2">
+          <nav className="flex flex-wrap items-center gap-2" aria-label="Primary">
             <Link className={navItemBase} href="/app">
               Studio
             </Link>
@@ -40,7 +40,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           Runtime-aware pipeline: Firebase + Gemini primary, local mock fallback for recovery.
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl px-6 py-8 md:py-10">{children}</main>
+      <main id="main-content" className="mx-auto w-full max-w-6xl px-6 py-8 md:py-10">
+        {children}
+      </main>
     </div>
   );
 }

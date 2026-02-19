@@ -29,3 +29,4 @@ jobs:
         with:
           name: live-provider-canary-reports
           path: var/reports/live-provider-canary
+          retention-days: 14

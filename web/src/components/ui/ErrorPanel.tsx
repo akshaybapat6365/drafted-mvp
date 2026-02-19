@@ -14,7 +14,11 @@ export function ErrorPanel({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[color-mix(in srgb,var(--color-danger) 58%,transparent)] bg-[color-mix(in srgb,var(--color-danger) 15%,transparent)] px-5 py-4 text-sm text-[var(--color-danger)]">
+    <div
+      role="alert"
+      aria-live="assertive"
+      className="rounded-xl border border-[color-mix(in srgb,var(--color-danger) 58%,transparent)] bg-[color-mix(in srgb,var(--color-danger) 15%,transparent)] px-5 py-4 text-sm text-[var(--color-danger)]"
+    >
       <div>{message}</div>
       {code || retryable || attempts ? (
         <div className="mt-2 flex flex-wrap gap-2 text-xs uppercase tracking-[0.08em]">
