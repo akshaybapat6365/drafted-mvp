@@ -86,11 +86,3 @@ def init_db() -> None:
             )
             if changed:
                 conn.commit()
-            conn.execute(
-                text(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_jobs_session_idempotency "
-                    "ON jobs(session_id, idempotency_key) "
-                    "WHERE idempotency_key IS NOT NULL"
-                )
-            )
-            conn.commit()

@@ -20,7 +20,6 @@ import {
 } from "@/components/ui";
 import { firebaseAuth } from "@/lib/firebaseClient";
 import { apiJson } from "@/lib/api";
-import { emitTelemetry } from "@/lib/telemetry";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -58,19 +57,8 @@ export default function SignupPage() {
         setErrorRetryable(isRetryable(r.status));
         setErrorAttempts(r.attempts ?? null);
         setError(r.status === 409 ? "This email is already registered." : r.error);
-        emitTelemetry({
-          event_name: "signup_failed",
-          page: "/signup",
-          status: "error",
-          metadata: {
-            code: r.code ?? null,
-            attempts: r.attempts ?? null,
-            request_id: r.requestId ?? null,
-          },
-        });
         return;
       }
-      emitTelemetry({ event_name: "signup_succeeded", page: "/signup", status: "success" });
       router.push("/app");
       return;
     }
@@ -79,16 +67,9 @@ export default function SignupPage() {
     } catch (e) {
       setLoading(false);
       setError(toAuthMessage(e));
-      emitTelemetry({
-        event_name: "signup_failed",
-        page: "/signup",
-        status: "error",
-        metadata: { provider: "firebase_email" },
-      });
       return;
     }
     setLoading(false);
-    emitTelemetry({ event_name: "signup_succeeded", page: "/signup", status: "success" });
     router.push("/app");
   }
 
@@ -99,12 +80,6 @@ export default function SignupPage() {
     setErrorAttempts(null);
     if (!firebaseEnabled) {
       setError("Google sign-up is unavailable because Firebase auth is not configured.");
-      emitTelemetry({
-        event_name: "signup_failed",
-        page: "/signup",
-        status: "error",
-        metadata: { provider: "google", reason: "firebase_not_configured" },
-      });
       return;
     }
     setGoogleLoading(true);
@@ -113,21 +88,9 @@ export default function SignupPage() {
     } catch (e) {
       setGoogleLoading(false);
       setError(toAuthMessage(e));
-      emitTelemetry({
-        event_name: "signup_failed",
-        page: "/signup",
-        status: "error",
-        metadata: { provider: "google" },
-      });
       return;
     }
     setGoogleLoading(false);
-    emitTelemetry({
-      event_name: "signup_succeeded",
-      page: "/signup",
-      status: "success",
-      metadata: { provider: "google" },
-    });
     router.push("/app");
   }
 
@@ -165,14 +128,10 @@ export default function SignupPage() {
               </div>
             ) : null}
 
-            <form className="mt-6 grid gap-4" onSubmit={onSubmit} aria-describedby="signup-help">
-              <p id="signup-help" className="sr-only">
-                Enter email and password with minimum 8 characters, then submit.
-              </p>
+            <form className="mt-6 grid gap-4" onSubmit={onSubmit}>
               <label className="grid gap-2 text-sm">
                 <span className="font-semibold text-[var(--color-ink)]">Email</span>
                 <input
-                  id="signup-email"
                   className="input-base"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -186,7 +145,6 @@ export default function SignupPage() {
               <label className="grid gap-2 text-sm">
                 <span className="font-semibold text-[var(--color-ink)]">Password</span>
                 <input
-                  id="signup-password"
                   className="input-base"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

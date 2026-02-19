@@ -9,18 +9,7 @@ from ..models import User
 
 
 def get_db():
-    try:
-        db = SessionLocal()
-    except Exception as exc:
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "code": "database_unavailable",
-                "message": "Database connection is unavailable",
-                "details": {"reason": str(exc)[:200]},
-                "retryable": True,
-            },
-        )
+    db = SessionLocal()
     try:
         yield db
     finally:

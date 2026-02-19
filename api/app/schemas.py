@@ -148,11 +148,3 @@ class ApiErrorOut(BaseModel):
     message: str
     details: dict[str, Any] | None = None
     retryable: bool = False
-
-
-class FrontendEventIn(BaseModel):
-    event_name: str = Field(min_length=2, max_length=120)
-    page: str = Field(min_length=1, max_length=240)
-    status: str | None = Field(default=None, max_length=64)
-    metadata: dict[str, Any] | None = None
-    at: dt.datetime | None = None

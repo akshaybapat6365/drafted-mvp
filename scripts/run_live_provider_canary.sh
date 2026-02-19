@@ -7,8 +7,6 @@ ENV_FILE="${ENV_FILE:-${ROOT_DIR}/deploy/env/.env.prod}"
 ENV_TEMPLATE="${ENV_TEMPLATE:-${ROOT_DIR}/deploy/env/.env.example}"
 PROJECT_NAME="${PROJECT_NAME:-drafted-live-canary}"
 REPORT_DIR="${ROOT_DIR}/var/reports/live-provider-canary"
-API_HOST_PORT="${API_HOST_PORT:-18000}"
-WEB_HOST_PORT="${WEB_HOST_PORT:-13000}"
 
 mkdir -p "${REPORT_DIR}"
 
@@ -57,9 +55,9 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   cp "${ENV_TEMPLATE}" "${ENV_FILE}"
 fi
 upsert_env "DRAFTED_DOMAIN" "localhost"
-upsert_env "API_BASE_URL" "http://127.0.0.1:${API_HOST_PORT}"
-upsert_env "WEB_BASE_URL" "http://127.0.0.1:${WEB_HOST_PORT}"
-upsert_env "CORS_ORIGINS" "http://localhost,http://127.0.0.1:${WEB_HOST_PORT}"
+upsert_env "API_BASE_URL" "http://localhost"
+upsert_env "WEB_BASE_URL" "http://localhost"
+upsert_env "CORS_ORIGINS" "http://localhost,http://127.0.0.1:3000"
 upsert_env "GEMINI_API_KEY" "${GEMINI_API_KEY}"
 upsert_env "TRANSIENT_STUB_ENABLED" "false"
 upsert_env "TRANSIENT_STUB_FAIL_FIRST_N" "0"
@@ -68,14 +66,12 @@ upsert_env "TRANSIENT_STUB_HTTP_CODE" "503"
 upsert_env "TRANSIENT_STUB_SCOPE" "spec"
 
 echo "[live-canary] starting compose services"
-export API_HOST_PORT
-export WEB_HOST_PORT
 compose up -d --build postgres redis api worker | tee "${REPORT_DIR}/up.txt"
 
-HEALTH_URL="http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health" MAX_ATTEMPTS=80 SLEEP_SECONDS=2 \
+HEALTH_URL="http://127.0.0.1:8000/api/v1/system/health" MAX_ATTEMPTS=80 SLEEP_SECONDS=2 \
   bash "${ROOT_DIR}/deploy/scripts/health_gate.sh" | tee "${REPORT_DIR}/health-gate.txt"
 
-health_payload="$(curl -fsS "http://127.0.0.1:${API_HOST_PORT}/api/v1/system/health")"
+health_payload="$(curl -fsS "http://127.0.0.1:8000/api/v1/system/health")"
 printf '%s\n' "${health_payload}" > "${REPORT_DIR}/health.json"
 provider_mode="$(printf '%s' "${health_payload}" | jq -r '.provider_mode // "unknown"')"
 if [[ "${provider_mode}" != "gemini" ]]; then
@@ -88,7 +84,7 @@ email="live-canary-${suffix}@example.com"
 password="password123"
 
 echo "[live-canary] signup"
-signup_payload="$(curl -fsS -X POST "http://127.0.0.1:${API_HOST_PORT}/api/v1/auth/signup" \
+signup_payload="$(curl -fsS -X POST "http://127.0.0.1:8000/api/v1/auth/signup" \
   -H "content-type: application/json" \
   -d "{\"email\":\"${email}\",\"password\":\"${password}\"}")"
 printf '%s\n' "${signup_payload}" > "${REPORT_DIR}/signup.json"
@@ -99,7 +95,7 @@ if [[ -z "${token}" ]]; then
 fi
 
 echo "[live-canary] create session"
-session_payload="$(curl -fsS -X POST "http://127.0.0.1:${API_HOST_PORT}/api/v1/sessions" \
+session_payload="$(curl -fsS -X POST "http://127.0.0.1:8000/api/v1/sessions" \
   -H "content-type: application/json" \
   -H "authorization: Bearer ${token}" \
   -d "{\"title\":\"Live Canary ${suffix}\"}")"
@@ -111,7 +107,7 @@ if [[ -z "${session_id}" ]]; then
 fi
 
 echo "[live-canary] submit job"
-job_submit_payload="$(curl -fsS -X POST "http://127.0.0.1:${API_HOST_PORT}/api/v1/jobs/sessions/${session_id}" \
+job_submit_payload="$(curl -fsS -X POST "http://127.0.0.1:8000/api/v1/jobs/sessions/${session_id}" \
   -H "content-type: application/json" \
   -H "authorization: Bearer ${token}" \
   -d '{"prompt":"Canary: 2 bed 2 bath compact contemporary home","bedrooms":2,"bathrooms":2,"style":"contemporary","want_exterior_image":false}')"
@@ -125,7 +121,7 @@ fi
 echo "[live-canary] poll terminal status"
 final_payload=""
 for _ in $(seq 1 120); do
-  final_payload="$(curl -fsS -X GET "http://127.0.0.1:${API_HOST_PORT}/api/v1/jobs/${job_id}" \
+  final_payload="$(curl -fsS -X GET "http://127.0.0.1:8000/api/v1/jobs/${job_id}" \
     -H "authorization: Bearer ${token}")"
   status="$(printf '%s' "${final_payload}" | jq -r '.status // "unknown"')"
   if [[ "${status}" == "succeeded" || "${status}" == "failed" ]]; then

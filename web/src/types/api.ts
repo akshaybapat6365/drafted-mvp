@@ -3,7 +3,6 @@ export type ProviderMode = "mock" | "gemini";
 export type HealthOut = {
   ok?: boolean;
   provider_mode: ProviderMode;
-  request_id?: string;
   queue?: {
     queued?: number;
     running?: number;

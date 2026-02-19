@@ -45,7 +45,7 @@ services:
     volumes:
       - app-var:/app/var
     ports:
-      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
+      - "127.0.0.1:8000:8000"
     restart: unless-stopped
 
   worker:
@@ -80,7 +80,7 @@ services:
       api:
         condition: service_started
     ports:
-      - "127.0.0.1:${WEB_HOST_PORT:-3000}:3000"
+      - "127.0.0.1:3000:3000"
     restart: unless-stopped
 
   caddy:

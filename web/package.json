@@ -6,11 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "perf:budgets": "node scripts/check-route-budgets.mjs",
-    "perf:report": "node scripts/bundle-report.mjs",
-    "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test e2e/smoke.spec.ts"
+    "lint": "eslint"
   },
   "dependencies": {
     "firebase": "^11.0.2",
@@ -20,7 +16,6 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.54.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

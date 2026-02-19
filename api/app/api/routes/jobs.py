@@ -7,14 +7,12 @@ import mimetypes
 import zipfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ...config import settings
-from ...logging import get_request_id, log_event
 from ...models import Artifact, HouseSpec as HouseSpecRow, Job, Session as SessionRow, User
 from ...schemas import ArtifactsOut, ArtifactOut, JobCreateIn, JobOut, JobRegenerateIn
 from ..deps import get_current_user, get_db
@@ -166,31 +164,7 @@ def create_job(
         stage_timestamps_json=json.dumps({"queued": now}),
     )
     db.add(job)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        if payload.idempotency_key:
-            dedup = (
-                db.query(Job)
-                .filter(
-                    Job.session_id == session_id,
-                    Job.idempotency_key == payload.idempotency_key,
-                )
-                .order_by(Job.created_at.desc())
-                .first()
-            )
-            if dedup:
-                return _job_out(dedup)
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "idempotency_conflict",
-                "message": "Conflicting concurrent request detected",
-                "retryable": False,
-                "details": {"request_id": get_request_id()},
-            },
-        )
+    db.commit()
     db.refresh(job)
     return _job_out(job)
 
@@ -258,12 +232,7 @@ def regenerate_job(
 
 
 @router.post("/{job_id}/export")
-def export_job(
-    job_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
+def export_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     _assert_job_owner(db, user, job_id)
     rows = db.query(Artifact).filter(Artifact.job_id == job_id).order_by(Artifact.created_at.asc()).all()
     if not rows:
@@ -314,24 +283,11 @@ def export_job(
         }
         z.writestr("manifest.json", json.dumps(manifest, indent=2))
 
-    log_event(
-        "api",
-        "artifacts_exported",
-        job_id=job_id,
-        user_id=user.id,
-        artifact_count=len(rows),
-        zip_path=str(zip_path),
-    )
     return FileResponse(
         zip_path,
         media_type="application/zip",
         filename=zip_path.name,
-        headers={
-            "x-export-artifact-count": str(len(rows)),
-            "x-request-id": request.headers.get("x-request-id")
-            or request.headers.get("x-trace-id")
-            or get_request_id(),
-        },
+        headers={"x-export-artifact-count": str(len(rows))},
     )
 
 
@@ -357,7 +313,6 @@ def list_artifacts(job_id: str, db: Session = Depends(get_db), user: User = Depe
         )
         for a in rows
     ]
-    log_event("api", "artifacts_listed", job_id=job_id, count=len(items), user_id=user.id)
     return ArtifactsOut(job_id=job_id, items=items)
 
 
@@ -376,12 +331,4 @@ def download_artifact(
             detail={"code": "artifact_missing", "message": "Artifact missing on disk", "retryable": False},
         )
     media_type = art.mime_type or (mimetypes.guess_type(str(path))[0] or "application/octet-stream")
-    log_event(
-        "api",
-        "artifact_downloaded",
-        user_id=user.id,
-        job_id=job_id,
-        artifact_id=artifact_id,
-        mime_type=media_type,
-    )
     return FileResponse(path, media_type=media_type, filename=path.name)

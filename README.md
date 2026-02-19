@@ -1,6 +1,6 @@
-# Drafted MVP (Firebase-Native Backend)
+# Drafted MVP (Local Dev, API-First)
 
-This repo is a working MVP of a Drafted-like workflow with Firebase-native backend services:
+This repo is a working MVP of a Drafted-like workflow:
 
 - Prompt + constraints -> `HouseSpec` (authoritative structured state)
 - `HouseSpec` -> deterministic `PlanGraph` -> `plan.svg` artifact (local, non-AI rendering)
@@ -9,46 +9,10 @@ This repo is a working MVP of a Drafted-like workflow with Firebase-native backe
 
 ## Structure
 
-- `functions/`: Firebase Cloud Functions backend (HTTP API + async job worker trigger)
-- `api/`: legacy FastAPI backend (kept for reference/migration support)
+- `api/`: FastAPI backend, SQLite persistence, in-process worker, artifact storage under `api/var/`
 - `web/`: Next.js frontend (App Router) that talks to the backend via rewrites
-- `firebase.json` + rules files: Hosting/Functions/Firestore/Storage project config
 - `deploy/`: VM automation (Docker Compose, Caddy, systemd, deploy scripts)
 - `tests/load` + `tests/failure`: load and failure-injection assets for beta gating
-
-## Firebase-native setup
-
-1. Configure Firebase project:
-
-```bash
-cd /Users/akshaybapat/drafted-mvp
-cp .firebaserc .firebaserc.local
-# Edit .firebaserc with your real project ID
-```
-
-2. Install web and functions dependencies:
-
-```bash
-cd /Users/akshaybapat/drafted-mvp/web && npm install
-cd /Users/akshaybapat/drafted-mvp/functions && npm install
-```
-
-3. Build/deploy functions and hosting:
-
-```bash
-cd /Users/akshaybapat/drafted-mvp/functions
-npm run build
-firebase deploy --only functions,hosting,firestore,storage
-```
-
-4. Set required function environment secrets/vars:
-
-- `GEMINI_API_KEY`
-- `GEMINI_TEXT_MODEL` (default `gemini-2.5-flash`)
-- `GEMINI_IMAGE_MODEL_PREVIEW` (default `gemini-3-pro-image-preview`)
-- `GCS_BUCKET` (optional if default bucket is configured)
-
-Detailed runbook: `docs/firebase-native-deployment.md`
 
 ## Run (Dev)
 

@@ -1,13 +1,6 @@
 export type ApiResult<T> =
   | { ok: true; data: T }
-  | {
-      ok: false;
-      error: string;
-      status?: number;
-      code?: string;
-      attempts?: number;
-      requestId?: string;
-    };
+  | { ok: false; error: string; status?: number; code?: string; attempts?: number };
 
 export type ApiRequestInit = RequestInit & {
   timeoutMs?: number;
@@ -54,13 +47,6 @@ function isNetworkError(error: unknown): boolean {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function createTraceId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return (crypto.randomUUID as () => string)();
-  }
-  return `trace-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
 async function authToken(): Promise<string | null> {
@@ -149,7 +135,6 @@ export async function apiJson<T>(
   path: string,
   init?: ApiRequestInit,
 ): Promise<ApiResult<T>> {
-  const traceId = createTraceId();
   const retries = clampInt(init?.retries ?? 0, 0, MAX_RETRIES);
   const retryDelayMs = clampInt(
     init?.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS,
@@ -177,13 +162,9 @@ export async function apiJson<T>(
       const token = await authToken();
       const res = await fetch(path, {
         ...init,
-        cache: "no-store",
         signal: controller.signal,
         headers: {
           "content-type": "application/json",
-          "x-trace-id": traceId,
-          "x-request-id": traceId,
-          "x-client-cache-policy": "no-store",
           ...(token ? { authorization: `Bearer ${token}` } : {}),
           ...(init?.headers ?? {}),
         },
@@ -192,7 +173,6 @@ export async function apiJson<T>(
 
       const text = await res.text();
       const data = parseResponseBody(text);
-      const requestId = res.headers.get("x-request-id") ?? traceId;
       if (!res.ok) {
         if (attempt < retries && retryableStatus(res.status)) {
           await wait(retryDelayMs * (attempt + 1));
@@ -204,7 +184,6 @@ export async function apiJson<T>(
           code: extractErrorCode(data),
           error: extractErrorMessage(data, res.status),
           attempts: attempt + 1,
-          requestId,
         };
       }
       return { ok: true, data: data as T };
@@ -221,7 +200,6 @@ export async function apiJson<T>(
           code: "timeout",
           error: `Request timed out after ${timeoutMs}ms.`,
           attempts: attempt + 1,
-          requestId: traceId,
         };
       }
       if (isNetworkError(e)) {
@@ -231,14 +209,12 @@ export async function apiJson<T>(
           error:
             "Network error reaching API. Ensure web and API services are running.",
           attempts: attempt + 1,
-          requestId: traceId,
         };
       }
       return {
         ok: false,
         error: e instanceof Error ? e.message : "Unknown error",
         attempts: attempt + 1,
-        requestId: traceId,
       };
     } finally {
       clearTimeout(timeoutId);
@@ -251,6 +227,5 @@ export async function apiJson<T>(
     code: "retry_exhausted",
     error: "Request failed after retry attempts were exhausted.",
     attempts: retries + 1,
-    requestId: traceId,
   };
 }

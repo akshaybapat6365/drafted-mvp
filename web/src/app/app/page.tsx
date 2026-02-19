@@ -17,14 +17,6 @@ import {
   StatusPill,
 } from "@/components/ui";
 import { apiJson } from "@/lib/api";
-import {
-  asError,
-  asLoading,
-  asSuccess,
-  initialAsyncState,
-  uiStateLabel,
-} from "@/lib/asyncState";
-import { emitTelemetry } from "@/lib/telemetry";
 import type { HealthOut, JobOut, ProviderMode, SessionOut } from "@/types/api";
 
 type JobFilter = "all" | "running" | "succeeded" | "failed";
@@ -37,7 +29,6 @@ const FILTERS: Array<{ value: JobFilter; label: string }> = [
 ];
 
 export default function StudioPage() {
-  const [asyncState, setAsyncState] = useState(initialAsyncState());
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [jobs, setJobs] = useState<JobOut[]>([]);
   const [jobFilter, setJobFilter] = useState<JobFilter>("all");
@@ -105,7 +96,6 @@ export default function StudioPage() {
 
   async function refresh() {
     const firstLoad = sessions.length === 0 && jobs.length === 0;
-    setAsyncState((current) => asLoading(current));
     if (firstLoad) setLoading(true);
     else setRefreshing(true);
     setError(null);
@@ -132,7 +122,6 @@ export default function StudioPage() {
       } else {
         setStaleData(true);
       }
-      setAsyncState((current) => asError(r.error, current));
       return;
     }
     setSessions(r.data);
@@ -145,13 +134,11 @@ export default function StudioPage() {
       setError("Session data refreshed, but jobs could not be loaded.");
       setStaleData(true);
       setLastSyncedAt(new Date().toISOString());
-      setAsyncState((current) => asError(j.error, current));
       return;
     }
     setJobs(j.data);
     setStaleData(false);
     setLastSyncedAt(new Date().toISOString());
-    setAsyncState(asSuccess());
     setLoading(false);
     setRefreshing(false);
   }
@@ -192,27 +179,8 @@ export default function StudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (asyncState.phase === "idle") return;
-    emitTelemetry({
-      event_name: "studio_state_change",
-      page: "/app",
-      status: uiStateLabel(asyncState),
-      metadata: {
-        stale: asyncState.stale,
-        error: asyncState.error,
-        sessions: sessions.length,
-        jobs: jobs.length,
-      },
-    });
-  }, [asyncState, sessions.length, jobs.length]);
-
   return (
-    <div
-      className="grid gap-8"
-      data-ui-state={uiStateLabel(asyncState)}
-      aria-busy={loading || refreshing}
-    >
+    <div className="grid gap-8">
       <FadeSlideIn>
         <SectionHeader
           kicker="Mission Control"
@@ -267,11 +235,7 @@ export default function StudioPage() {
       ) : null}
 
       {lastSyncedAt ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.08em] text-[var(--color-ink-muted)]"
-        >
+        <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.08em] text-[var(--color-ink-muted)]">
           <span>Last sync: {new Date(lastSyncedAt).toLocaleString()}</span>
           {staleData ? (
             <Badge tone="warning">stale data</Badge>
@@ -389,7 +353,6 @@ export default function StudioPage() {
                 onChange={(e) => setJobSearch(e.target.value)}
                 placeholder="Search by prompt, style, or job ID"
                 type="search"
-                aria-label="Search jobs by prompt, style, status, stage, or job ID"
               />
               <div className="flex flex-wrap gap-2">
                 {FILTERS.map((filter) => (
@@ -398,7 +361,6 @@ export default function StudioPage() {
                     variant={jobFilter === filter.value ? "primary" : "plate"}
                     size="sm"
                     onClick={() => setJobFilter(filter.value)}
-                    aria-pressed={jobFilter === filter.value}
                   >
                     {filter.label}
                   </Button>

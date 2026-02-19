@@ -22,15 +22,6 @@ import {
   Timeline,
 } from "@/components/ui";
 import { apiJson } from "@/lib/api";
-import {
-  asError,
-  asLoading,
-  asSuccess,
-  initialAsyncState,
-  uiStateLabel,
-} from "@/lib/asyncState";
-import { emitTelemetry } from "@/lib/telemetry";
-import { safeExternalUrl } from "@/lib/urlSafety";
 import type {
   ArtifactsOut,
   ArtifactOut,
@@ -88,7 +79,6 @@ function isTerminalStatus(status: string): boolean {
 
 export default function JobDetailClient({ jobId }: { jobId: string }) {
   const router = useRouter();
-  const [asyncState, setAsyncState] = useState(initialAsyncState());
 
   const [job, setJob] = useState<JobOut | null>(null);
   const [artifacts, setArtifacts] = useState<ArtifactOut[]>([]);
@@ -107,7 +97,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [regenerating, setRegenerating] = useState(false);
   const [retryingFailed, setRetryingFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "manual" | "error">("idle");
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   const planSvg = useMemo(
     () => artifacts.find((artifact) => artifact.type === "plan_svg") ?? null,
@@ -120,18 +110,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const exterior = useMemo(
     () => artifacts.find((artifact) => artifact.type === "exterior_image") ?? null,
     [artifacts],
-  );
-  const safePlanUrl = useMemo(
-    () => (planSvg ? safeExternalUrl(planSvg.url) : null),
-    [planSvg],
-  );
-  const safeSpecUrl = useMemo(
-    () => (specJson ? safeExternalUrl(specJson.url) : null),
-    [specJson],
-  );
-  const safeExteriorUrl = useMemo(
-    () => (exterior ? safeExternalUrl(exterior.url) : null),
-    [exterior],
   );
   const timelineItems = useMemo(() => {
     if (!job) return [];
@@ -183,7 +161,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
   async function refresh(options?: { interactive?: boolean }) {
     const interactive = options?.interactive ?? false;
-    setAsyncState((current) => asLoading(current));
     if (interactive) setRefreshing(true);
     if (!job) setLoading(true);
     setArtifactsError(null);
@@ -201,17 +178,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setErrorAttempts(r.attempts ?? null);
       setError(r.status === 401 ? "Please log in to view this job." : r.error);
       setPollMs((current) => Math.min(current * 2, 10_000));
-      setAsyncState((current) => asError(r.error, current));
-      emitTelemetry({
-        event_name: "job_detail_refresh_failed",
-        page: "/app/jobs/[jobId]",
-        status: "error",
-        metadata: {
-          code: r.code ?? null,
-          attempts: r.attempts ?? null,
-          request_id: r.requestId ?? null,
-        },
-      });
       return;
     }
 
@@ -221,7 +187,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
     setErrorRetryable(false);
     setErrorAttempts(null);
     setJob(r.data);
-    setAsyncState(asSuccess());
     setLoading(false);
     setRefreshing(false);
 
@@ -265,20 +230,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setErrorRetryable(isRetryableStatus(r.status));
       setErrorAttempts(r.attempts ?? null);
       setError(r.error);
-      setAsyncState((current) => asError(r.error, current));
-      emitTelemetry({
-        event_name: "job_regenerate_failed",
-        page: "/app/jobs/[jobId]",
-        status: "error",
-        metadata: {
-          code: r.code ?? null,
-          attempts: r.attempts ?? null,
-          request_id: r.requestId ?? null,
-        },
-      });
       return;
     }
-    setAsyncState(asSuccess());
     router.push(`/app/jobs/${encodeURIComponent(r.data.id)}`);
   }
 
@@ -301,10 +254,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setErrorRetryable(isRetryableStatus(r.status));
       setErrorAttempts(r.attempts ?? null);
       setError(r.error);
-      setAsyncState((current) => asError(r.error, current));
       return;
     }
-    setAsyncState(asSuccess());
     router.push(`/app/jobs/${encodeURIComponent(r.data.id)}`);
   }
 
@@ -328,56 +279,23 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       setErrorRetryable(isRetryableStatus(r.status));
       setErrorAttempts(r.attempts ?? null);
       setError(r.error);
-      setAsyncState((current) => asError(r.error, current));
       return;
     }
-    const safeUrl = safeExternalUrl(r.data.url);
-    if (!safeUrl) {
-      setError("Export URL is invalid. Refresh and try again.");
-      setAsyncState((current) =>
-        asError("Export URL is invalid. Refresh and try again.", current),
-      );
-      return;
-    }
-    emitTelemetry({
-      event_name: "job_export_opened",
-      page: "/app/jobs/[jobId]",
-      status: "success",
-      metadata: { job_id: jobId },
-    });
-    window.open(safeUrl, "_blank", "noopener,noreferrer");
+    window.open(r.data.url, "_blank", "noopener,noreferrer");
   }
 
   async function copyJobId() {
     if (!navigator.clipboard) {
-      setCopyState("manual");
-      emitTelemetry({
-        event_name: "job_id_copy_manual_required",
-        page: "/app/jobs/[jobId]",
-        status: "manual",
-        metadata: { job_id: jobId },
-      });
-      window.setTimeout(() => setCopyState("idle"), 2200);
+      setCopyState("error");
+      window.setTimeout(() => setCopyState("idle"), 1400);
       return;
     }
     try {
       await navigator.clipboard.writeText(jobId);
       setCopyState("copied");
-      emitTelemetry({
-        event_name: "job_id_copied",
-        page: "/app/jobs/[jobId]",
-        status: "success",
-        metadata: { job_id: jobId },
-      });
       window.setTimeout(() => setCopyState("idle"), 1400);
     } catch {
       setCopyState("error");
-      emitTelemetry({
-        event_name: "job_id_copy_failed",
-        page: "/app/jobs/[jobId]",
-        status: "error",
-        metadata: { job_id: jobId },
-      });
       window.setTimeout(() => setCopyState("idle"), 1400);
     }
   }
@@ -410,11 +328,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   }, [jobId, autoRefresh, pollMs, job?.status]);
 
   return (
-    <div
-      className="grid gap-8"
-      data-ui-state={uiStateLabel(asyncState)}
-      aria-busy={loading || refreshing}
-    >
+    <div className="grid gap-8">
       <FadeSlideIn>
         <SectionHeader
           kicker="Execution Feed"
@@ -447,8 +361,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
               <Button variant="ghost" size="md" onClick={copyJobId}>
                 {copyState === "copied"
                   ? "Copied"
-                  : copyState === "manual"
-                    ? "Copy manually"
                   : copyState === "error"
                     ? "Copy failed"
                     : "Copy job ID"}
@@ -667,15 +579,6 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                 <div className="mt-4 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-3 text-xs text-[var(--color-ink-muted)]">
                   Job ID: <code>{jobId}</code>
                 </div>
-                {copyState === "manual" ? (
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className="mt-3 rounded-xl border border-[color-mix(in srgb,var(--color-warning) 52%,transparent)] bg-[color-mix(in srgb,var(--color-warning) 12%,transparent)] px-3 py-2 text-xs text-[var(--color-warning)]"
-                  >
-                    Clipboard is unavailable. Select the job ID text and copy manually.
-                  </div>
-                ) : null}
               </Card>
             </div>
           </StaggerItem>
@@ -692,16 +595,10 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                 <div className="mt-5 grid gap-4 lg:grid-cols-2">
                   <div className="panel-frost p-3">
                     <div className="mb-2 text-sm font-semibold">Plan SVG</div>
-                    {planSvg && safePlanUrl ? (
+                    {planSvg ? (
                       <>
                         <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
-                          <img
-                            alt="Plan SVG preview"
-                            src={safePlanUrl}
-                            className="h-auto w-full"
-                            loading="lazy"
-                            decoding="async"
-                          />
+                          <img alt="Plan SVG preview" src={planSvg.url} className="h-auto w-full" />
                         </div>
                         <div className="mt-2 text-[11px] text-[var(--color-ink-muted)]">
                           {sizeLabel(planSvg.size_bytes)}
@@ -714,16 +611,10 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
 
                   <div className="panel-frost p-3">
                     <div className="mb-2 text-sm font-semibold">Exterior render</div>
-                    {exterior && safeExteriorUrl ? (
+                    {exterior ? (
                       <>
                         <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
-                          <img
-                            alt="Exterior render"
-                            src={safeExteriorUrl}
-                            className="h-auto w-full"
-                            loading="lazy"
-                            decoding="async"
-                          />
+                          <img alt="Exterior render" src={exterior.url} className="h-auto w-full" />
                         </div>
                         <div className="mt-2 text-[11px] text-[var(--color-ink-muted)]">
                           {sizeLabel(exterior.size_bytes)}
@@ -738,11 +629,11 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                   </div>
                 </div>
 
-                {specJson && safeSpecUrl ? (
+                {specJson ? (
                   <div className="mt-4">
                     <a
                       className="nav-pill border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)]"
-                      href={safeSpecUrl}
+                      href={specJson.url}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -782,43 +673,33 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
                       }
                     />
                   ) : (
-                    manifestItems.map((artifact) => {
-                      const safeArtifactUrl = safeExternalUrl(artifact.url);
-                      return (
-                        <a
-                          key={artifact.id}
-                          href={safeArtifactUrl ?? "#"}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(event) => {
-                            if (safeArtifactUrl) return;
-                            event.preventDefault();
-                            setError("Artifact URL is invalid. Refresh and retry.");
-                          }}
-                          className="panel-frost block p-3 transition hover:translate-y-[-1px]"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <div className="text-sm font-semibold">
-                                {artifactLabel(artifact.type)}
-                              </div>
-                              <div className="mt-1 text-xs text-[var(--color-ink-muted)]">
-                                {artifact.mime_type} · {sizeLabel(artifact.size_bytes)}
-                              </div>
-                              <div className="mt-1 text-[11px] text-[var(--color-ink-muted)]">
-                                {new Date(artifact.created_at).toLocaleString()}
-                              </div>
+                    manifestItems.map((artifact) => (
+                      <a
+                        key={artifact.id}
+                        href={artifact.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="panel-frost block p-3 transition hover:translate-y-[-1px]"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-semibold">{artifactLabel(artifact.type)}</div>
+                            <div className="mt-1 text-xs text-[var(--color-ink-muted)]">
+                              {artifact.mime_type} · {sizeLabel(artifact.size_bytes)}
                             </div>
-                            <Badge tone="neutral">{safeArtifactUrl ? "Open" : "Invalid URL"}</Badge>
+                            <div className="mt-1 text-[11px] text-[var(--color-ink-muted)]">
+                              {new Date(artifact.created_at).toLocaleString()}
+                            </div>
                           </div>
-                          {artifact.checksum_sha256 ? (
-                            <div className="mt-2 truncate text-[11px] text-[var(--color-ink-muted)]">
-                              sha256: <code>{artifact.checksum_sha256}</code>
-                            </div>
-                          ) : null}
-                        </a>
-                      );
-                    })
+                          <Badge tone="neutral">Open</Badge>
+                        </div>
+                        {artifact.checksum_sha256 ? (
+                          <div className="mt-2 truncate text-[11px] text-[var(--color-ink-muted)]">
+                            sha256: <code>{artifact.checksum_sha256}</code>
+                          </div>
+                        ) : null}
+                      </a>
+                    ))
                   )}
                 </div>
               </Card>
