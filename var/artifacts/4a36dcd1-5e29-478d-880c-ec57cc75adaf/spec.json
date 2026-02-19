@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "style": "contemporary",
+  "bedrooms": 4,
+  "bathrooms": 3,
+  "rooms": [
+    {
+      "id": "1a7f8170-34ce-477c-94b7-e1c33466c011",
+      "type": "living",
+      "name": "Great Room",
+      "area_ft2": 320.0
+    },
+    {
+      "id": "72c16522-3584-4d94-bafc-0f73c7c77806",
+      "type": "kitchen",
+      "name": "Kitchen",
+      "area_ft2": 220.0
+    },
+    {
+      "id": "f556899c-1588-478e-ad5a-04571220097f",
+      "type": "dining",
+      "name": "Dining",
+      "area_ft2": 160.0
+    },
+    {
+      "id": "778d1068-13c7-4749-8ce4-ed842f639a96",
+      "type": "laundry",
+      "name": "Laundry",
+      "area_ft2": 70.0
+    },
+    {
+      "id": "12bda670-048f-494f-8140-e74897b8d483",
+      "type": "bedroom",
+      "name": "Primary Bedroom",
+      "area_ft2": 240.0
+    },
+    {
+      "id": "e9458aa6-d133-481f-a744-35115815c635",
+      "type": "bedroom",
+      "name": "Bedroom 2",
+      "area_ft2": 150.0
+    },
+    {
+      "id": "3fb9644e-e43f-469f-bbdf-93341f9d8080",
+      "type": "bedroom",
+      "name": "Bedroom 3",
+      "area_ft2": 150.0
+    },
+    {
+      "id": "767c8498-7f8e-4098-a9f6-9d0632c171b0",
+      "type": "bedroom",
+      "name": "Bedroom 4",
+      "area_ft2": 150.0
+    },
+    {
+      "id": "6b59ca47-70a7-43c1-8a15-e3787bc604d7",
+      "type": "bathroom",
+      "name": "Bathroom 1",
+      "area_ft2": 70.0
+    },
+    {
+      "id": "db52f22a-9ab2-47b0-a2ab-bde75a458521",
+      "type": "bathroom",
+      "name": "Bathroom 2",
+      "area_ft2": 70.0
+    },
+    {
+      "id": "92c692e4-8029-43a2-b64b-6969b57e207e",
+      "type": "bathroom",
+      "name": "Bathroom 3",
+      "area_ft2": 70.0
+    }
+  ],
+  "notes": [
+    "Mock provider: set GEMINI_API_KEY to enable real model-driven specs and exterior images.",
+    "This spec is authoritative; images (when enabled) are presentation-only."
+  ]
+}

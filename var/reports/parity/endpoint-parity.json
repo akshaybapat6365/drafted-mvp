@@ -1,0 +1,90 @@
+{
+  "generated_at": "2026-02-19T06:48:38.057646+00:00",
+  "rows": [
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/system/health",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/v1/sessions",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/sessions",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/jobs",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/jobs/sessions/{sessionId}",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/v1/jobs/sessions/{sessionId}",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/jobs/{jobId}",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/v1/jobs/{jobId}/regenerate",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/jobs/{jobId}/artifacts",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/jobs/{jobId}/artifacts/{artifactId}/download",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "POST",
+      "endpoint": "/api/v1/jobs/{jobId}/export",
+      "functions": true,
+      "api": true,
+      "ok": true
+    },
+    {
+      "method": "GET",
+      "endpoint": "/api/v1/me/limits",
+      "functions": true,
+      "api": true,
+      "ok": true
+    }
+  ],
+  "failed": false
+}

@@ -1,0 +1,66 @@
+{
+  "generated_at": "2026-02-19T06:48:38.195Z",
+  "client_total_kb": 865.43,
+  "client_total_kb_max": 900,
+  "routes": [
+    {
+      "route": "/",
+      "html_kb": 20.06,
+      "rsc_kb": 11.12,
+      "js_kb": 0,
+      "limits": {
+        "html_kb_max": 70,
+        "rsc_kb_max": 80
+      }
+    },
+    {
+      "route": "/login",
+      "html_kb": 13.59,
+      "rsc_kb": 5.88,
+      "js_kb": 0,
+      "limits": {
+        "html_kb_max": 90,
+        "rsc_kb_max": 90
+      }
+    },
+    {
+      "route": "/signup",
+      "html_kb": 13.68,
+      "rsc_kb": 5.88,
+      "js_kb": 0,
+      "limits": {
+        "html_kb_max": 90,
+        "rsc_kb_max": 90
+      }
+    },
+    {
+      "route": "/app",
+      "html_kb": 22.17,
+      "rsc_kb": 8.36,
+      "js_kb": 0,
+      "limits": {
+        "html_kb_max": 95,
+        "rsc_kb_max": 100
+      }
+    },
+    {
+      "route": "/app/drafts/new",
+      "html_kb": 0,
+      "rsc_kb": 0,
+      "js_kb": 1.06,
+      "limits": {
+        "js_kb_max": 160
+      }
+    },
+    {
+      "route": "/app/jobs/[jobId]",
+      "html_kb": 0,
+      "rsc_kb": 0,
+      "js_kb": 1.06,
+      "limits": {
+        "js_kb_max": 200
+      }
+    }
+  ],
+  "violations": []
+}
